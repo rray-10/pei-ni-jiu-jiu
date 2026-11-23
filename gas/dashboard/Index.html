@@ -1,0 +1,74 @@
+<!doctype html>
+<!--
+  RECONSTRUCTED：Drive 上原 Index.html 為 0 bytes（2026-11-23 檢查），原始版本待組員提供。
+  本檔依 Scripts.html 的元素 id 與 Styles.html 的 class 重建，並加入 Hub 導覽。
+  取得原版後請以原版為準，僅合併 <nav> 與 HUB_CONFIG 區塊。
+-->
+<html lang="zh-Hant">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include('Styles') ?>
+  <?!= include('NavStyles') ?>
+  <script>window.HUB_CONFIG = <?!= JSON.stringify(config).replace(/</g, '\\u003c') ?>;</script>
+  <? if (config.liffId) { ?><script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script><? } ?>
+</head>
+<body>
+<div class="hub">
+  <nav class="sidebar" id="sidebar" aria-label="主選單">
+    <div class="brand">陪你久久<small>照護小幫手</small></div>
+    <a href="?page=dashboard" aria-current="page" id="navDash">📊 健康摘要</a>
+    <a href="<?= config.nav.daily || '#' ?>" class="<?= config.nav.daily ? '' : 'disabled' ?>">📝 每日記錄</a>
+    <a href="<?= config.nav.member || '#' ?>" class="<?= config.nav.member ? '' : 'disabled' ?>">👥 會員中心</a>
+    <a href="<?= config.nav.medication || '#' ?>" class="<?= config.nav.medication ? '' : 'disabled' ?>">💊 用藥提醒設定</a>
+    <a href="#" id="navSummary">📄 就診摘要 PDF</a>
+    <small class="note" style="padding:8px 12px">回診管理請在 LINE 對話中操作（選單 ⑥）。</small>
+  </nav>
+  <div class="scrim" id="scrim"></div>
+  <div class="content">
+    <div class="devbanner" id="devBanner" hidden>開發測試模式：未經 LINE 驗證，請勿使用真實患者資料。</div>
+    <header>
+      <button class="menu-btn" id="menuBtn" aria-label="開啟選單" aria-controls="sidebar">☰</button>
+      <div class="brand">陪你久久<small>健康摘要</small></div>
+    </header>
+    <main>
+      <div id="message" class="message" hidden role="alert"></div>
+      <div id="loading" class="center" role="status">載入中…</div>
+      <div id="app" hidden>
+        <section class="patient"><label for="patient">被照護者</label><select id="patient"></select></section>
+        <div id="dashboard">
+          <div class="top"><div><p class="eyebrow">DASHBOARD</p><h1>健康摘要</h1></div><button class="outline" id="summaryBtn">就診摘要</button></div>
+          <div class="switch subtle" id="periodTabs">
+            <button data-days="7" class="active">7 天</button><button data-days="30">30 天</button><button data-days="90">90 天</button>
+          </div>
+          <div class="cards">
+            <article><p>最新血壓</p><strong id="latestBP">—</strong><small id="latestTime"></small></article>
+            <article><p>平均血壓／血糖</p><strong id="avgBP">—</strong><small id="avgGlucose"></small></article>
+            <article><p>用藥回報率</p><strong id="medRate">—</strong><small id="medCount"></small></article>
+            <article><p>下次回診</p><strong id="nextVisit">—</strong><small id="visitDetail"></small></article>
+          </div>
+          <section class="panel">
+            <h2 id="chartTitle">血壓趨勢</h2>
+            <div class="switch" id="metricTabs">
+              <button data-metric="bp" class="active">血壓</button><button data-metric="glucose">血糖</button><button data-metric="med">用藥</button>
+            </div>
+            <div class="chart" id="chart"></div>
+            <p class="note" id="chartNote"></p>
+          </section>
+        </div>
+        <div id="summary" hidden>
+          <button class="back" id="backBtn">← 返回</button>
+          <h1>就診摘要</h1>
+          <div id="summaryBody"></div>
+          <button class="primary full" id="pdfBtn">下載 PDF 摘要</button>
+        </div>
+      </div>
+    </main>
+    <footer>本頁僅供照護參考，不代表醫療診斷。</footer>
+  </div>
+</div>
+<?!= include('NavScripts') ?>
+<?!= include('Scripts') ?>
+</body>
+</html>
