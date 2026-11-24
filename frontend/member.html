@@ -1,39 +1,109 @@
 <style>
- #memberGate{max-width:520px;margin:0 auto;padding:16px 16px 40px;font:16px/1.55 system-ui,-apple-system,'Noto Sans TC',sans-serif;color:#25362e}
- #memberGate form,#memberGate section:not([hidden]){padding:18px;margin:14px 0;background:#f1f7f3;border-radius:12px}
- #memberGate label,#memberGate input{display:block;width:100%}
- #memberGate input,#memberGate button,#memberGate a{font:inherit;margin:8px 0;padding:9px}
- #memberGate input{box-sizing:border-box;border:1px solid #779083;border-radius:8px}
- #memberGate button{color:white;background:#246044;border:0;border-radius:8px}
- #memberGate output{overflow-wrap:anywhere;display:block}
- #memberGate fieldset{border:0;margin:0;padding:0}
- #memberGate legend{font-weight:700;margin-bottom:8px}
- #memberGate .opt{display:flex;gap:8px;align-items:center}
- #memberGate .opt input{width:auto;margin:0}
- #memberGate button.danger{color:#a33a2f;background:white;border:1px solid #a33a2f}
- #memberGate ul{list-style:none;margin:0;padding:0}
- #memberGate li{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 0;border-top:1px solid #dce7df}
- #memberGate li .who{flex:1 1 100%}
- #memberGate li button{margin:0;padding:6px 12px}
- #memberGate .group{margin:12px 0 0}
- #memberGate button.secondary{color:#246044;background:white;border:1px solid #246044}
- #memberGate #choose button{width:100%;margin:10px 0;padding:16px}
- #hubModule[hidden],#memberGate [hidden],#memberGate[hidden]{display:none!important}
+ #memberGate{--green:#38775c;--green-d:#246044;--light:#eaf4ed;--ink:#25362e;--muted:#697b72;--line:#dce7df;--orange:#e09a55;--cream:#fbf3e8;--red:#a33a2f;
+  max-width:520px;margin:0 auto;padding:12px 16px 40px;font:17px/1.55 system-ui,-apple-system,"Noto Sans TC",sans-serif;color:var(--ink)}
+ #memberGate *{box-sizing:border-box}
+ #memberGate [hidden]{display:none!important}
+ #hubModule[hidden]{display:none!important}
+ #memberGate .ico{width:24px;height:24px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+ #memberGate .gate-brand{display:flex;align-items:center;justify-content:center;gap:10px;padding:8px 0 14px}
+ #memberGate .gate-brand svg{width:46px;height:46px}
+ #memberGate .gate-brand b{display:block;font-size:24px;line-height:1.15;color:#1f4d38}
+ #memberGate .gate-brand small{display:block;font-size:15px;color:var(--muted)}
+ #memberGate h1{margin:6px 0 10px;text-align:center;font-size:30px;line-height:1.25;color:#1f4d38}
+ #memberGate h2{margin:0 0 10px;font-size:22px;line-height:1.3;color:#1f4d38}
+ #memberGate h3{margin:0;font-size:19px}
+ #memberGate p{margin:0 0 10px}
+ #memberGate #memberStatus{display:block;margin:0 auto 14px;padding:8px 16px;width:fit-content;max-width:100%;border-radius:999px;background:#fff;border:1px solid var(--line);color:var(--muted);text-align:center;font-size:16px}
+ #memberGate #memberStatus.ok{background:var(--light);border-color:#cfe3d5;color:var(--green-d);font-weight:700}
+ #memberGate #memberStatus.error{background:#fdecea;border-color:#f1c2bd;color:var(--red);font-weight:700;border-radius:14px}
+ #memberGate #memberStatus:empty{display:none}
+ #memberGate .card,#memberGate form,#memberGate #switchPanel,#memberGate #familyPanel>section{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;margin:0 0 14px;box-shadow:0 2px 10px rgba(56,119,92,.06)}
+ #memberGate #familyPanel{display:block;padding:0;margin:0;background:none;border:0;box-shadow:none}
+ #memberGate label{display:block;margin:12px 0 4px;font-weight:600}
+ #memberGate input:not([type=checkbox]):not([type=radio]){display:block;width:100%;min-height:52px;padding:10px 14px;font:inherit;color:var(--ink);background:#fff;border:1.5px solid #9db3a5;border-radius:12px}
+ #memberGate input:focus{outline:3px solid #b9d9c6;border-color:var(--green)}
+ #memberGate .opt{display:flex;align-items:center;gap:12px;min-height:48px;margin:4px 0;font-weight:500}
+ #memberGate .opt input{width:24px;height:24px;margin:0;accent-color:var(--green)}
+ #memberGate fieldset{border:0;margin:0;padding:0;min-width:0}
+ #memberGate legend{padding:0;margin:0 0 6px;font-weight:700;color:var(--green-d)}
+ #memberGate .group{margin:14px 0 2px;font-weight:700}
+ #memberGate details{margin:12px 0;padding:10px 12px;background:var(--light);border-radius:12px}
+ #memberGate summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:600}
+ #memberGate button,#memberGate a.btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:52px;margin:10px 0 0;padding:10px 16px;font:inherit;font-weight:700;color:#fff;background:var(--green-d);border:0;border-radius:14px;cursor:pointer;text-decoration:none}
+ #memberGate button:disabled{opacity:.55}
+ #memberGate button.secondary,#memberGate a.btn.secondary{color:var(--green-d);background:var(--light);border:1px solid #cfe3d5}
+ #memberGate button.danger{color:var(--red);background:#fff5f4;border:1.5px solid #e3a9a3}
+ #memberGate #choose button{justify-content:flex-start;min-height:64px;font-size:19px}
+ #memberGate #choose button span{flex:1;text-align:left}
+ #memberGate #choose button .chev{flex:none;width:22px;height:22px}
+ #memberGate .hero{display:block;width:150px;height:110px;margin:4px auto 6px}
+ #memberGate .lead{text-align:center;color:var(--muted)}
+ #proxyNotice{margin:12px 0;padding:12px 14px;background:var(--cream);border:1px solid #f0dcc0;border-radius:12px;font-size:16px}
+ #joinPreview{padding:16px;margin:8px 0;background:var(--light);border-radius:14px;font-size:19px;font-weight:700;text-align:center}
+ #switchBlock{padding:10px 14px;background:#fff5e6;border:1px solid #f0d3a0;border-radius:12px}
+ #switchBlock:empty{display:none}
+ #memberGate output{display:block;overflow-wrap:anywhere;word-break:break-all}
+ /* bound view */
+ #memberGate .patient{display:flex;align-items:center;gap:16px;background:var(--light);border-color:#cfe3d5}
+ #memberGate .avatar{display:inline-flex;align-items:center;justify-content:center;flex:none;width:64px;height:64px;border-radius:50%;background:#cfe3d5;color:var(--green-d);font-size:28px;font-weight:700}
+ #memberGate #patientName{margin:0;font-size:28px}
+ #familyRole{display:inline-flex;align-items:center;gap:6px;margin:6px 0 0;padding:4px 12px;border-radius:999px;background:#fbe9d2;color:#8a5a1f;font-weight:700;font-size:16px}
+ #familyRole svg{width:18px;height:18px;fill:currentColor;stroke:none}
+ #memberLinks{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:0 0 14px}
+ #memberLinks a{display:flex;align-items:center;gap:8px;min-height:56px;padding:10px 12px;background:var(--light);border-radius:14px;color:var(--green-d);font-weight:700;text-decoration:none}
+ #memberLinks a span{flex:1}
+ #memberLinks a .chev{width:18px;height:18px;margin-left:auto}
+ #inviteCard{background:var(--cream)!important;border-color:#f0dcc0!important}
+ #inviteCard .head{display:flex;gap:12px;align-items:flex-start}
+ #inviteCard .head svg{margin-top:2px;color:var(--green-d)}
+ #inviteCard p{color:var(--muted);font-size:16px;margin:2px 0 0}
+ #inviteCode,#inviteLink{margin-top:12px;padding:10px 12px;background:#fff;border:1px dashed #c9b48f;border-radius:10px;font-size:15px}
+ #inviteCode:empty{display:none}
+ #membersBox .title{display:flex;align-items:center;gap:10px;margin-bottom:6px;color:var(--green-d)}
+ #memberList{list-style:none;margin:0;padding:0}
+ #memberList li{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+ #memberList li:first-child{border-top:0}
+ #memberList li .avatar{width:44px;height:44px;font-size:20px}
+ #memberList li .who{font-weight:600}
+ #memberList li .actions{grid-column:1 / -1;display:flex;gap:8px;justify-content:flex-end}
+ #memberList li .actions button{width:auto;min-height:44px;margin:0;padding:6px 14px;font-size:16px}
+ #memberList li .actions button.secondary{background:#fff;border:1.5px solid var(--green)}
+ #unbind{margin-top:6px}
 </style>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+ <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></symbol>
+ <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17.5" cy="9" r="2.6"/><path d="M17 14.2c2.9.2 4.8 2.2 4.8 5"/></symbol>
+ <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+ <symbol id="i-chart" viewBox="0 0 24 24"><path d="M5 20V11M12 20V5M19 20v-7"/></symbol>
+ <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></symbol>
+ <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></symbol>
+ <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+ <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></symbol>
+ <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/></symbol>
+ <symbol id="i-crown" viewBox="0 0 24 24"><path d="M3 8l4 4 5-7 5 7 4-4-2 11H5z"/></symbol>
+ <symbol id="i-add" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M19 8v6M16 11h6"/></symbol>
+</svg>
 <main id="memberGate">
+ <div class="gate-brand" aria-hidden="true">
+  <svg viewBox="0 0 48 48"><path d="M24 41C10 31 5 24 5 17.5 5 12 9 8 14 8c4 0 8 2.5 10 6.5C26 10.5 30 8 34 8c5 0 9 4 9 9.5C43 24 38 31 24 41z" fill="none" stroke="#38775c" stroke-width="3.5" stroke-linejoin="round"/><path d="M13 24h6l3-6 4 11 3-5h6" fill="none" stroke="#e09a55" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <div><b>陪你久久</b><small>照護小幫手</small></div>
+ </div>
  <h1 id="memberHeading">陪你久久</h1>
  <p id="memberStatus" role="status">正在確認 LINE 與家庭身分…</p>
  <div id="onboarding" hidden>
-  <div id="choose">
-   <button type="button" id="chooseStart">為自己建立照護家庭</button>
-   <button type="button" id="chooseProxy" class="secondary">替家人建立照護家庭</button>
-   <button type="button" id="chooseJoin" class="secondary">加入家人的照護家庭</button>
+  <div id="choose" class="card">
+   <svg class="hero" viewBox="0 0 150 110" aria-hidden="true"><path d="M10 58L75 8l65 50" fill="none" stroke="#bcd9c6" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="58" cy="66" r="16" fill="#cfe3d5"/><circle cx="92" cy="68" r="15" fill="#fbe9d2"/><path d="M30 104c0-14 12-22 28-22s28 8 28 22M70 104c0-12 10-20 22-20s24 8 24 20" fill="#cfe3d5" opacity=".8"/><path d="M75 36c-4-6-12-2-9 4 2 3 9 8 9 8s7-5 9-8c3-6-5-10-9-4z" fill="#e09a55" opacity=".75"/></svg>
+   <button type="button" id="chooseStart"><svg class="ico"><use href="#i-person"/></svg><span>建立照護家庭</span><svg class="ico chev"><use href="#i-chev"/></svg></button>
+   <button type="button" id="chooseJoin" class="secondary"><svg class="ico"><use href="#i-link"/></svg><span>加入家人的照護家庭</span><svg class="ico chev"><use href="#i-chev"/></svg></button>
   </div>
   <form id="startFamily" hidden>
-   <h2 id="startTitle">為自己建立照護家庭</h2>
-   <p id="proxyNotice" hidden>請先取得患者本人同意。建立後你會是管理者；患者本人之後用你產生的邀請連結加入，再由你把他設為管理者。<label class="opt"><input type="checkbox" name="consent">我已取得患者同意</label></p>
+   <h2 id="startTitle">建立照護家庭</h2>
    <fieldset id="startStep1">
     <legend>步驟 1／2　基本資料</legend>
+    <p class="group">這個家庭是為誰建立？</p>
+    <label class="opt"><input type="radio" name="forWhom" value="self" checked>我自己</label>
+    <label class="opt"><input type="radio" name="forWhom" value="proxy">我的家人（我替家人建立）</label>
+    <p id="proxyNotice" hidden>請先取得患者本人同意。建立後你會是管理者；患者本人之後用你產生的邀請連結加入，再由你把他設為管理者。<label class="opt"><input type="checkbox" name="consent">我已取得患者同意</label></p>
     <label>照護對象的稱呼（家人在畫面上看到的名字）<input name="patientName" required maxlength="60"></label>
     <label>出生年（選填）<input name="birthYear" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="例如 1956"></label>
     <p class="group">慢性病（選填，可複選）</p>
@@ -58,8 +128,8 @@
      <label>血糖下限<input type="number" min="0" max="1000" name="t:blood_glucose:alertLow"></label>
      <label>血糖上限<input type="number" min="0" max="1000" name="t:blood_glucose:alertHigh"></label>
     </details>
-    <button type="button" id="backStep1" class="secondary">上一步</button>
     <button>確認建立</button>
+    <button type="button" id="backStep1" class="secondary">上一步</button>
    </fieldset>
    <button type="button" class="secondary back">返回</button>
   </form>
@@ -85,21 +155,26 @@
   <button type="button" id="cancelSwitch" class="secondary">取消</button>
  </section>
  <section id="familyPanel" hidden>
-  <h2 id="patientName"></h2>
-  <p id="familyRole"></p>
+  <section class="patient">
+   <span class="avatar" id="avatar" aria-hidden="true"></span>
+   <div><h2 id="patientName"></h2><p id="familyRole"></p></div>
+  </section>
   <div id="memberLinks"></div>
-  <button id="invite" hidden>產生家人邀請碼</button>
-  <output id="inviteCode"></output>
-  <div id="inviteShare" hidden>
-   <output id="inviteLink"></output>
-   <button type="button" id="copyInvite" class="secondary">複製邀請連結</button>
-   <a id="shareInvite" target="_blank" rel="noopener">用 LINE 傳給家人</a>
-  </div>
+  <section id="inviteCard">
+   <div class="head"><svg class="ico"><use href="#i-add"/></svg><div><h3>邀請家人加入</h3><p>產生邀請碼或連結，讓家人加入同一個照護家庭。</p></div></div>
+   <button id="invite"><svg class="ico"><use href="#i-link"/></svg>產生家人邀請碼</button>
+   <output id="inviteCode"></output>
+   <div id="inviteShare" hidden>
+    <output id="inviteLink"></output>
+    <button type="button" id="copyInvite" class="secondary"><svg class="ico"><use href="#i-copy"/></svg>複製邀請連結</button>
+    <a id="shareInvite" class="btn" target="_blank" rel="noopener"><svg class="ico"><use href="#i-send"/></svg>用 LINE 傳給家人</a>
+   </div>
+  </section>
   <section id="membersBox" hidden>
-   <h3>家庭成員</h3>
+   <div class="title"><svg class="ico"><use href="#i-people"/></svg><h3>家庭成員</h3></div>
    <ul id="memberList"></ul>
   </section>
-  <button id="retryMenu" hidden>重試更新 LINE 選單</button>
-  <button id="unbind" class="danger">解除綁定</button>
+  <button id="retryMenu" class="secondary" hidden>重試更新 LINE 選單</button>
+  <button id="unbind" class="danger"><svg class="ico"><use href="#i-trash"/></svg>解除綁定</button>
  </section>
 </main>

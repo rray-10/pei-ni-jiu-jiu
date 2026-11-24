@@ -14,7 +14,7 @@ test('member, daily, dashboard and appointment routes share a binding gate', () 
     assert.match(markup,/id="joinFamily"/);
     assert.match(markup,/id="chooseStart"/);
     assert.match(markup,/id="chooseJoin"/);
-    assert.match(markup,/id="chooseProxy"/);
+    assert.match(markup,/name="forWhom"/);
     assert.match(markup,/id="switchPanel"/);
     assert.equal(markup.match(/\/liff\/edge\/2\/sdk.js/g).length,1);
   }

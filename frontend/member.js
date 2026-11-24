@@ -2,7 +2,9 @@
 window.hubSession = (async () => {
   const cfg = window.MEMBER_CONFIG;
   const $ = id => document.getElementById(id);
-  const status = text => { $('memberStatus').textContent = text; };
+  const status = (text, kind = '') => { const el = $('memberStatus'); el.textContent = text; el.className = kind; };
+  const icon = name => '<svg class="ico" aria-hidden="true"><use href="#i-' + name + '"></use></svg>';
+  const linkIcons = {'健康摘要':'chart','每日紀錄':'edit','會員中心':'people'};
   try {
     await liff.init({liffId:cfg.liffId});
     if (!liff.isLoggedIn()) {
@@ -24,16 +26,25 @@ window.hubSession = (async () => {
       $('familyPanel').hidden = false;
       $('memberHeading').textContent = '會員中心';
       $('patientName').textContent = data.patientName;
-      $('familyRole').textContent = data.role === 'admin' ? '家庭管理者' : '家人';
+      $('avatar').textContent = Array.from(data.patientName || '')[0] || '';
+      $('familyRole').innerHTML = data.role === 'admin' ? icon('crown') : '';
+      $('familyRole').append(data.role === 'admin' ? '家庭管理者' : '家人');
       $('invite').hidden = data.role !== 'admin';
-      $('memberLinks').replaceChildren(...Object.entries(cfg.links).filter(([,url]) => url).map(([label,url]) => {
-        const link = document.createElement('a');
-        link.textContent = label;
-        link.href = url;
-        return link;
-      }));
+      $('inviteCard').hidden = data.role !== 'admin';
+      $('memberLinks').replaceChildren(...Object.entries(cfg.links)
+        .filter(([label,url]) => url && !(cfg.page === 'member' && label === '會員中心'))
+        .map(([label,url]) => {
+          const link = document.createElement('a');
+          link.href = url;
+          link.innerHTML = icon(linkIcons[label] || 'link');
+          const text = document.createElement('span');
+          text.textContent = label;
+          link.append(text);
+          link.insertAdjacentHTML('beforeend', '<svg class="ico chev" aria-hidden="true"><use href="#i-chev"></use></svg>');
+          return link;
+        }));
       $('retryMenu').hidden = data.menu !== 'retry';
-      status(cfg.page === 'appointments' ? '請返回 LINE 官方帳號，傳送「回診管理」。' : '已綁定照護家庭');
+      status(cfg.page === 'appointments' ? '請返回 LINE 官方帳號，傳送「回診管理」。' : '已綁定照護家庭','ok');
       if (cfg.page === 'member') loadMembers();
     }
     function finish(data) {
@@ -53,11 +64,17 @@ window.hubSession = (async () => {
         const admin = result.role === 'admin';
         const rows = result.members.map(member => {
           const item = document.createElement('li');
+          const avatar = document.createElement('span');
+          avatar.className = 'avatar';
+          avatar.setAttribute('aria-hidden','true');
+          avatar.textContent = Array.from(member.displayName || '成')[0];
           const who = document.createElement('span');
           who.className = 'who';
           who.textContent = (member.displayName || '成員') + (member.isSelf ? '（你）' : '') + '・' + (member.role === 'admin' ? '管理者' : '成員');
-          item.append(who);
+          item.append(avatar, who);
           if (admin && !member.isSelf && member.role === 'member') {
+            const actions = document.createElement('div');
+            actions.className = 'actions';
             for (const [label, action, confirmText] of [['設為管理者','promoteMember','要把「' + (member.displayName || '這位成員') + '」設為管理者嗎？'],
                                                        ['移除','removeMember','要移除「' + (member.displayName || '這位成員') + '」嗎？對方將無法再查看或記錄資料。']]) {
               const button = document.createElement('button');
@@ -67,17 +84,18 @@ window.hubSession = (async () => {
               button.onclick = async () => {
                 if (!window.confirm(confirmText)) return;
                 button.disabled = true;
-                try { await api(action,{memberKey:member.key}); await loadMembers(); status(action === 'removeMember' ? '已移除成員' : '已設為管理者'); }
-                catch (err) { status(err.message); button.disabled = false; }
+                try { await api(action,{memberKey:member.key}); await loadMembers(); status(action === 'removeMember' ? '已移除成員' : '已設為管理者','ok'); }
+                catch (err) { status(err.message,'error'); button.disabled = false; }
               };
-              item.append(button);
+              actions.append(button);
             }
+            item.append(actions);
           }
           return item;
         });
         $('memberList').replaceChildren(...rows);
         $('membersBox').hidden = false;
-      } catch (err) { status(err.message); }
+      } catch (err) { status(err.message,'error'); }
     }
     const data = await api('memberStatus');
     $('invite').onclick = async () => {
@@ -94,7 +112,7 @@ window.hubSession = (async () => {
         };
         $('inviteShare').hidden = false;
         status('請私下交給一位家人。邀請碼 24 小時內只能使用一次。');
-      } catch (err) { status(err.message); }
+      } catch (err) { status(err.message,'error'); }
       finally { $('invite').disabled = false; }
     };
     $('unbind').onclick = async () => {
@@ -102,10 +120,10 @@ window.hubSession = (async () => {
       $('unbind').disabled = true;
       try {
         await api('unbind');
-        status('已解除綁定，LINE 選單會恢復為未綁定樣式。請關閉此頁。');
+        status('已解除綁定，LINE 選單會恢復為未綁定樣式。請關閉此頁。','ok');
         $('familyPanel').hidden = true;
         $('memberHeading').textContent = '已解除綁定';
-      } catch (err) { status(err.message); $('unbind').disabled = false; }
+      } catch (err) { status(err.message,'error'); $('unbind').disabled = false; }
     };
     $('retryMenu').onclick = async () => {
       $('retryMenu').disabled = true;
@@ -113,7 +131,7 @@ window.hubSession = (async () => {
         const result = await api('syncMenu');
         $('retryMenu').hidden = result.menu !== 'retry';
         status(result.menu === 'linked' ? '已更新 LINE 選單' : 'LINE 選單更新未完成');
-      } catch (err) { status(err.message); }
+      } catch (err) { status(err.message,'error'); }
       finally { $('retryMenu').disabled = false; }
     };
     if (data.bound && validInvite && cfg.page === 'bind') {
@@ -134,10 +152,10 @@ window.hubSession = (async () => {
               const result = await api('switchFamily',{inviteCode:invited});
               $('switchPanel').hidden = true;
               resolve(finish(result));
-            } catch (err) { status(err.message); $('doSwitch').disabled = false; }
+            } catch (err) { status(err.message,'error'); $('doSwitch').disabled = false; }
           };
         });
-      } catch (err) { status(err.message); }
+      } catch (err) { status(err.message,'error'); }
     }
     if (data.bound) return finish(data);
     $('onboarding').hidden = false;
@@ -153,7 +171,7 @@ window.hubSession = (async () => {
       show('choose');
       step('startFamily','startStep1');
       step('joinFamily','joinStep1');
-      status('請選擇為自己建立家庭，或輸入家人提供的邀請碼。');
+      status('請選擇建立新的照護家庭，或輸入家人提供的邀請碼。');
     };
     reset();
     return await new Promise(resolve => {
@@ -171,19 +189,17 @@ window.hubSession = (async () => {
           } else {
             resolve(finish(result));
           }
-        } catch (err) { status(err.message); }
+        } catch (err) { status(err.message,'error'); }
         finally { disable(false); }
       };
-      let proxy = false;
-      const openStart = isProxy => {
-        proxy = isProxy;
-        $('startTitle').textContent = isProxy ? '替家人建立照護家庭' : '為自己建立照護家庭';
-        $('proxyNotice').hidden = !isProxy;
+      const isProxy = form => form.elements.forWhom.value === 'proxy';
+      $('startFamily').elements.forWhom.forEach(radio => {
+        radio.onchange = () => { $('proxyNotice').hidden = !isProxy($('startFamily')); };
+      });
+      $('chooseStart').onclick = () => {
         show('startFamily'); step('startFamily','startStep1');
         status('先填寫基本資料，下一步再選擇追蹤項目。');
       };
-      $('chooseStart').onclick = () => openStart(false);
-      $('chooseProxy').onclick = () => openStart(true);
       $('chooseJoin').onclick = () => { show('joinFamily'); step('joinFamily','joinStep1'); status('請輸入家人提供的邀請碼。'); };
       for (const button of $('onboarding').querySelectorAll('.back')) button.onclick = reset;
       $('backStep1').onclick = () => step('startFamily','startStep1');
@@ -191,7 +207,7 @@ window.hubSession = (async () => {
       $('toStep2').onclick = () => {
         const form = $('startFamily');
         const year = form.elements.birthYear.value.trim();
-        if (proxy && !form.elements.consent.checked) { status('請先勾選「我已取得患者同意」'); return; }
+        if (isProxy(form) && !form.elements.consent.checked) { status('請先勾選「我已取得患者同意」'); return; }
         if (!form.elements.patientName.value.trim()) { status('請輸入稱呼'); form.elements.patientName.focus(); return; }
         if (year && !/^\d{4}$/.test(year)) { status('出生年請輸入 4 位數西元年'); return; }
         step('startFamily','startStep2');
@@ -213,7 +229,7 @@ window.hubSession = (async () => {
           return complete('createFamily',{
             patientName:form.get('patientName'),birthYear:form.get('birthYear'),
             conditions:[...form.getAll('condition'),...(other ? [other] : [])],
-            allergies:form.get('allergies'),metrics,thresholds,proxy,consent:proxy && form.get('consent') === 'on'
+            allergies:form.get('allergies'),metrics,thresholds,proxy:form.get('forWhom') === 'proxy',consent:form.get('forWhom') === 'proxy' && form.get('consent') === 'on'
           });
         }
         $('toStep2').click();
@@ -228,7 +244,7 @@ window.hubSession = (async () => {
           $('joinPreview').textContent = '要加入「' + result.preview.patientName + '」的照護家庭嗎？';
           step('joinFamily','joinStep2');
           status('請確認家庭名稱。');
-        } catch (err) { status(err.message); }
+        } catch (err) { status(err.message,'error'); }
         finally { disable(false); }
       };
       if (validInvite) {
@@ -239,7 +255,7 @@ window.hubSession = (async () => {
       }
     });
   } catch (err) {
-    status(err.message || '無法確認 LINE 與家庭身分');
+    status(err.message || '無法確認 LINE 與家庭身分','error');
     return false;
   }
 })();
