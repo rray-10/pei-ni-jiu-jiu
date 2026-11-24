@@ -1,12 +1,7 @@
-# Rollback 回復流程
+# 測試環境回復
 
-| 變更 | 回復方式 |
-|---|---|
-| 整合版 GAS（新測試專案） | 本整合**不覆蓋**既有 `/exec`。停用新部署（Deploy → Manage deployments → Archive）即可，既有 DEMO 不受影響 |
-| 回到原 DEMO 程式 | 以 `gas/dashboard/original-demo/` 的 Code.gs / Scripts.html / Styles.html / PdfTemplate.html 原樣貼回（Index.html 原版需組員提供） |
-| GAS 新版本問題 | Apps Script → Deploy → Manage deployments → 編輯 → 選舊版本 |
-| `FamilyPatients` 分頁 | 刪除該分頁即可；服務層自動退回 `pt_<familyId>` 預設 |
-| Sheet 資料 | 整合只讀；若有人工修改，使用 Sheet「版本記錄」或 migration-plan 的備份副本 |
-| n8n | 匯入前先匯出現行工作流 JSON（**移除 credentials 後**）存私人處；回復＝匯入舊 JSON |
-| Git | `git revert <commit>`；不改寫共用分支歷史 |
-| 緊急關閉讀取 | Script Properties 清空 `F1_SPREADSHEET_ID`，所有呼叫會回 `[CONFIG]` 而非資料 |
+先在測試 OA 還原 webhook URL 與 Rich Menu 綁定，再將測試 LIFF Endpoint 指向測試前保留的版本。停用測試 n8n 的 LINE 主流程與 F1 relay，檢查沒有啟用排程。若須回到上一測試部署，還原兩個 GAS Web App 版本、Node 版本及同版環境設定。
+
+工作簿在部署前保留表頭與虛構種子資料副本。保留要排查的匿名測試結果後，可將測試表恢復到副本。回診的 `FamilyPatients` 對照與 F1 測試表須與相應 GAS／n8n 設定一起回復。原儀表板檔案可從 `file/health_gas_mvp 2/` 取用。
+
+本次交付只包含本機分支修改。若日後要切換正式環境，先記錄正式 GAS 版本、LIFF Endpoint、OA webhook／Rich Menu、n8n 版本、表格備份，再由負責人授權切換。

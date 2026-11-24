@@ -1,12 +1,14 @@
 # 統一資料模型（Schema）
 
+目前部署與資料歸屬見 [整合決策與團隊更新](integration-audit.md)。
+
 原則：以 **family_id** 為授權單位；`patient_id` 保留。V2 MVP：一人一家庭、一家庭一位被照護者、一家庭多位成員。
 **本文件為提案，標「現況」者為已讀到的實際欄位，標「新增」者需組員確認後才建立；不會自動修改正式 Sheet。**
 
 ## 關係
 ```
-LINE User ID ─▶ Members ─▶ Families ─▶ FamilyPatients ─▶ Patients(未來)
-                                   └▶ DailyRecords / Appointments(經 patient_id) / MedicationCheckins(待建)
+LINE User ID ─▶ Members ─▶ Families (F1 照護對象名稱) ─▶ DailyRecords
+                             └─ FamilyPatients（確認後建立） ─▶ F3 patients ─▶ appointments
 ```
 
 ## 正式欄位命名
@@ -23,15 +25,18 @@ Sheet 現況沿用 camelCase（`familyId`、`lineUid`）；內部服務層統一
 > 約束（需由寫入端保證）：`lineUid` 全表唯一（一人一家庭）。目前沒有 `status`/`joinedAt`。
 > 現況資料含**真實格式的 LINE UID**（見 security.md）。
 
-### FamilyPatients（**新增，待確認**）
+### FamilyPatients（整合主檔）
 `familyId`(PK) · `patientId`(unique) — 建立家庭↔患者對照。
-未建立時服務層預設 `patientId = 'pt_' + familyId`，因此回診資料中的 `p001` 無法自動對到 `F001`。
+對照由自助綁定寫入，舊列可用回填計畫恢復既有 patient ID。
 
-### DailyRecords（現況，F1 Sheet）
+### FamilyInvites（整合新增）
+
+`codeHash`、`familyId`、`expiresAt`、`claimedBy`。一次使用，24 小時有效。
+
+### DailyRecords（F1 Sheet）
 `recordId` · `familyId` · `lineUid` · `recordedAt`(ISO UTC) · `metricKey` · `metricName` · `value`(字串) · `unit` · `note` · `source`(`LIFF`|`TEST`) · `createdAt` · `createdBy` · `route` · `recordDate`(`yyyy-MM-dd` 台北) · `period` · `memberId` · `valueNumeric` · `valueSystolic` · `valueDiastolic` · `schemaVersion` · `isRecorded`
-- 後六欄（`memberId`…`schemaVersion`）目前**全空**，adapter 不依賴。
-- `recordId = <recordedAt>-<metricKey>-<uid後6碼>`（現況規則）。
-- 建議 F1-A 之後在寫入端填 `valueNumeric/valueSystolic/valueDiastolic/schemaVersion=2`，adapter 即可優先讀取（目前一律由 `value` 解析）。
+- 新版表尾可增設 `patientId`。既有列可依字串 `value` 讀取。新版 adapter 優先讀 `valueNumeric/valueSystolic/valueDiastolic`，缺欄或空白時沿用 `value`。
+- 測試 GAS writer 的記錄鍵為家庭、提交者、客戶端提交 UUID 及項目鍵。F1-A 正式寫入格式仍需完整匯出確認。
 
 ### MetricDefinitions（現況）
 `metricKey` · `metricName` · `inputType` · `unit` · `isActive`
@@ -50,7 +55,7 @@ Sheet 現況沿用 camelCase（`familyId`、`lineUid`）；內部服務層統一
 
 ## 時間與時區
 - 儲存：`recordedAt/createdAt` 為 ISO（含 `Z` 或 `+08:00`）；業務日期 `recordDate/date` 為台北日曆日字串，不帶時區。
-- 讀 Sheet 時 GAS `Date` 物件必須用 `Asia/Taipei` 格式化（`Code.gs: cell_()`），**不可直接 `toISOString()`**（原 DEMO 的做法會把 00:00 的日期推到前一天）。
+- GAS 依試算表時區格式化純日期儲存格，以保留工作表上的日曆日。時間戳一律輸出含時區。
 
 ## 缺漏、重複、取消
 - 缺漏：欄位空白 → adapter 標 `quality`，空 `recordDate` 由 `recordedAt` 推導（`recordDate_derived`）。
