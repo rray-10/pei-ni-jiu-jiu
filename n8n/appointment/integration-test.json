@@ -1,0 +1,446 @@
+{
+  "name": "Integration test | F3 interactive",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "67d97a5b-0af5-45a7-a83e-09a42a68da70",
+      "name": "由主路由呼叫",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\nfor (const it of $input.all()) {\n  const j = it.json;\n  const body = j.body && j.body.events ? j.body : j;\n  for (const ev of (body.events || [])) out.push({ json: { event: ev } });\n}\nreturn out;\n"
+      },
+      "id": "09246472-487e-464c-acc4-26d4e7c56d27",
+      "name": "解析事件",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_STAGING_APPT_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "appointments"
+        },
+        "options": {}
+      },
+      "id": "57d8d692-7f0a-4ea2-bd14-2b6ebcf7df57",
+      "name": "讀取 appointments",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1344,
+        -64
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "// F3 回診：新增 / 編輯 / 取消 —— 依 Line 事件決定要寫入的資料與回覆訊息\n// 輸出兩種 item：{kind:'write', row:{...}} 與 {kind:'reply', replyToken, messages}\nconst clean = (name) => $(name).all().map(i => i.json).filter(r => r && Object.keys(r).length > 0);\nconst appts = clean('讀取 appointments');\n\nconst TZ = 'Asia/Taipei';\nconst now = DateTime.now().setZone(TZ);\nconst today = now.toISODate();\nconst SESSIONS = ['早診', '午診', '晚診'];\nconst WEEK = ['一', '二', '三', '四', '五', '六', '日'];\nconst ACTIVE = ['scheduled', 'edit_hospital'];\nconst BLUE = '#1E6FD9';\nconst OTHER_KEYWORDS = ['問醫師', '記血壓', '記血糖', '吃藥了', '拍報告', '出示摘要', '更多'];\n\nfunction parseQS(str) {\n try {\n  const m = Object.create(null);\n  for (const part of String(str || '').split('&')) {\n    if (!part) continue;\n    const i = part.indexOf('=');\n    const k = decodeURIComponent(i < 0 ? part : part.slice(0, i));\n    m[k] = decodeURIComponent((i < 0 ? '' : part.slice(i + 1)).replace(/\\+/g, ' '));\n  }\n  return { get: (k) => (k in m ? m[k] : null) };\n } catch { return { get: () => null }; }\n}\nconst s = (v) => (v === undefined || v === null ? '' : String(v).trim());\nfunction normDate(v) {\n  if (typeof v === 'number') return DateTime.fromISO('1899-12-30', { zone: TZ }).plus({ days: v }).toISODate();\n  const t = s(v).replace(/\\//g, '-');\n  const dt = DateTime.fromISO(t, { zone: TZ });\n  return dt.isValid ? dt.toISODate() : t;\n}\nconst row = (a) => ({\n  appt_id: s(a.appt_id), patient_id: s(a.patient_id), date: normDate(a.date),\n  session: s(a.session), hospital: s(a.hospital), department: s(a.department), status: s(a.status),\n});\n\nfunction fmtDate(d) {\n  const dt = DateTime.fromISO(d, { zone: TZ });\n  return dt.isValid ? `${dt.toFormat('M/d')}（${WEEK[dt.weekday - 1]}）` : d;\n}\nconst daysUntil = (d) => Math.round(DateTime.fromISO(d, { zone: TZ }).startOf('day').diff(now.startOf('day'), 'days').days);\nconst place = (a) => `${a.hospital} ${a.department}`.trim();\n\nfunction reminderText(a) {\n  const d = daysUntil(a.date);\n  const left = [7, 3, 1].filter((n) => n < d || (n === d && now.hour < 9));\n  if (left.length === 0) return d >= 0 ? '事前提醒時間已過，回診當晚會提醒記醫囑' : '這筆回診日期已過';\n  return `將在回診前 ${left.join('、')} 天早上 9 點用 Line 提醒`;\n}\n\n// ---------- 訊息 ----------\nconst textMsg = (text, quickItems) => {\n  const m = { type: 'text', text };\n  if (quickItems && quickItems.length) m.quickReply = { items: quickItems.map((action) => ({ type: 'action', action })) };\n  return m;\n};\nconst pb = (label, data, displayText) => ({ type: 'postback', label, data, displayText: displayText || label });\nconst datePicker = (label, id, initial) => ({\n  type: 'datetimepicker', label, data: `action=appt_date&id=${id}`, mode: 'date',\n  initial: initial && initial >= today ? initial : today, min: today,\n});\n\nfunction askDate(id, initial) {\n  return {\n    type: 'flex', altText: '請選擇回診日期',\n    contents: {\n      type: 'bubble',\n      body: { type: 'box', layout: 'vertical', spacing: 'md', contents: [\n        { type: 'text', text: '請選擇回診日期', size: 'xl', weight: 'bold', color: '#222222' },\n        { type: 'text', text: '點下方按鈕，從日曆選日期', size: 'md', color: '#555555', wrap: true },\n      ] },\n      footer: { type: 'box', layout: 'vertical', contents: [\n        { type: 'button', style: 'primary', color: BLUE, height: 'md', action: datePicker('選擇日期', id, initial) },\n      ] },\n    },\n  };\n}\nconst isTime = (v) => /^([01]\\d|2[0-3]):[0-5]\\d$/.test(s(v));\nconst timePicker = (label, a) => ({\n  type: 'datetimepicker', label, data: `action=appt_time&id=${a.appt_id}`, mode: 'time',\n  initial: isTime(a.session) ? a.session : '09:00',\n});\nconst askSession = (a, note) => ({\n  type: 'flex', altText: '請選擇看診時間',\n  contents: {\n    type: 'bubble',\n    body: { type: 'box', layout: 'vertical', spacing: 'md', contents: [\n      { type: 'text', text: `回診日期：${fmtDate(a.date)}`, size: 'md', color: '#555555' },\n      { type: 'text', text: note || '請選擇看診時間', size: 'xl', weight: 'bold', color: '#222222', wrap: true },\n    ] },\n    footer: { type: 'box', layout: 'vertical', contents: [\n      { type: 'button', style: 'primary', color: BLUE, height: 'md', action: timePicker('選擇時間', a) },\n    ] },\n  },\n});\nconst askHospital = (extra) => textMsg(`${extra ? extra + '\\n' : ''}請輸入「醫院 科別」，中間空一格\\n例如：台大 新陳代謝科\\n（輸入「取消」可離開）`);\n\nfunction card(a, title) {\n  return {\n    type: 'bubble',\n    header: { type: 'box', layout: 'vertical', backgroundColor: BLUE, paddingAll: '16px', contents: [\n      { type: 'text', text: title, color: '#FFFFFF', size: 'lg', weight: 'bold' },\n    ] },\n    body: { type: 'box', layout: 'vertical', spacing: 'md', contents: [\n      { type: 'text', text: fmtDate(a.date), size: 'xxl', weight: 'bold', color: '#222222' },\n      { type: 'text', text: a.session ? `時間 ${a.session}` : '（尚未選時間）', size: 'lg', color: '#222222' },\n      { type: 'text', text: place(a) || '（尚未填醫院科別）', size: 'lg', color: '#222222', wrap: true },\n      { type: 'separator', margin: 'md' },\n      { type: 'text', text: reminderText(a), size: 'md', color: '#555555', wrap: true, margin: 'md' },\n    ] },\n    footer: { type: 'box', layout: 'horizontal', spacing: 'md', contents: [\n      { type: 'button', style: 'secondary', height: 'md', action: pb('修改', `action=appt_edit&id=${a.appt_id}`, '修改回診') },\n      { type: 'button', style: 'secondary', height: 'md', action: pb('取消回診', `action=appt_cancel&id=${a.appt_id}`) },\n    ] },\n  };\n}\nconst cardMsg = (a, title) => ({ type: 'flex', altText: `${title}：${fmtDate(a.date)} ${a.session} ${place(a)}`, contents: card(a, title) });\n\nfunction editMenu(a) {\n  return textMsg(`要修改哪一項？\\n目前：${fmtDate(a.date)} ${a.session} ${place(a)}`, [\n    datePicker('改日期', a.appt_id, a.date),\n    timePicker('改時間', a),\n    pb('改醫院科別', `action=appt_edit_hosp&id=${a.appt_id}`),\n    pb('取消回診', `action=appt_cancel&id=${a.appt_id}`),\n  ]);\n}\nconst newBtn = pb('新增回診', 'action=appt_new');\nfunction menuCard() {\n  return {\n    type: 'flex', altText: '回診：新增回診／我的回診',\n    contents: {\n      type: 'bubble',\n      body: { type: 'box', layout: 'vertical', spacing: 'md', contents: [\n        { type: 'text', text: '回診', size: 'xl', weight: 'bold', color: '#222222' },\n        { type: 'text', text: '要做什麼？', size: 'md', color: '#555555' },\n      ] },\n      footer: { type: 'box', layout: 'vertical', spacing: 'md', contents: [\n        { type: 'button', style: 'primary', color: BLUE, height: 'md', action: pb('新增回診', 'action=appt_new') },\n        { type: 'button', style: 'secondary', height: 'md', action: pb('我的回診', 'action=appt_list') },\n      ] },\n    },\n  };\n}\n\n// ---------- 身分 ----------\n\n\n// ---------- 主流程 ----------\nconst out = [];\nlet curReplyToken = null; // 目前處理中事件的 replyToken，讓 write item 也帶著，存檔失敗時才能回覆使用者\nconst write = (r) => {\n  out.push({ json: { kind: 'write', row: r, replyToken: curReplyToken } });\n  const i = appts.findIndex((x) => s(x.appt_id) === r.appt_id);\n  if (i >= 0) appts[i] = r; else appts.push(r);\n};\n\nfor (const item of $('解析事件').all()) {\n  const ev = item.json.event || {};\n  if (!ev.replyToken || !ev.source || !ev.source.userId) continue;\n  if (!/^[A-Za-z0-9_-]{1,100}$/.test(ev.webhookEventId || '')) continue;\n  const newId = () => 'APT-' + ev.webhookEventId;\n  curReplyToken = ev.replyToken;\n  const msgs = [];\n  const reply = (...m) => msgs.push(...m);\n\n  let action = null, q = parseQS(''), text = null;\n  if (ev.type === 'postback' && ev.postback) {\n    q = parseQS(ev.postback.data);\n    action = q.get('action') || '';\n    if (!action.startsWith('appt_')) continue; // 不是回診功能的按鈕，交給其他流程\n  } else if (ev.type === 'message' && ev.message && ev.message.type === 'text') {\n    text = s(ev.message.text);\n    if (text === '回診' || text === '回診管理') action = 'appt_menu';\n    else if (text === '新增回診') action = 'appt_new';\n    else if (text === '我的回診' || text === '查看回診') action = 'appt_list';\n  } else continue;\n\n  const matches = clean('讀取 Members').filter(r => s(r.lineUid) === ev.source.userId);\n  const familyId = matches.length === 1 ? s(matches[0].familyId) : '';\n  const trustedFamily = $('由主路由呼叫').first().json.familyId;\n  const mapped = clean('讀取 FamilyPatients');\n  const rows = mapped.filter(r => s(r.familyId) === familyId);\n  const candidate = rows.length === 1 ? s(rows[0].patientId) : '';\n  const pid = familyId && familyId === trustedFamily && candidate &&\n    mapped.filter(r => s(r.patientId) === candidate).length === 1 ? candidate : null;\n  if (!pid) {\n    if (action) reply(textMsg('還找不到你的帳號資料。請先完成加入與同意，家人請先用邀請碼綁定，再使用回診功能。'));\n    if (msgs.length) out.push({ json: { kind: 'reply', replyToken: ev.replyToken, messages: msgs } });\n    continue;\n  }\n  const mine = () => appts.map(row).filter((a) => a.patient_id === pid);\n  const findMine = (id) => mine().find((a) => a.appt_id === id);\n  const id = q.get('id') || '';\n  if (action === 'appt_date' && findMine(newId())) continue;\n\n  // 一般文字：只有在「等待輸入醫院科別」時才處理\n  if (!action && text !== null) {\n    const pending = mine().find((a) => a.status === 'edit_hospital') ||\n      mine().find((a) => a.status === 'draft' && a.date && a.session);\n    const draftNoSession = mine().find((a) => a.status === 'draft' && a.date && !a.session);\n    const tokens = text.split(/\\s+/).filter(Boolean);\n    const looksOther = tokens.some((t) => /^[\\d\\/.,:-]+$/.test(t)) || OTHER_KEYWORDS.some((k) => text.startsWith(k));\n    if (!pending && !draftNoSession) continue;\n    if (looksOther) continue; // 可能是血壓、血糖等，交給 F1\n    if (text === '取消') {\n      const p = pending || draftNoSession;\n      write({ ...p, status: p.status === 'edit_hospital' ? 'scheduled' : 'cancelled' });\n      reply(textMsg(p.status === 'edit_hospital' ? '好的，醫院科別維持不變。' : '好的，已取消新增回診。', [newBtn]));\n    } else if (!pending) {\n      reply(askSession(draftNoSession, '請先選擇看診時間'));\n    } else if (tokens.length < 2) {\n      reply(askHospital('醫院和科別中間要空一格喔'));\n    } else {\n      const updated = { ...pending, hospital: tokens[0].slice(0, 30), department: tokens.slice(1).join(' ').slice(0, 30), status: 'scheduled' };\n      const isNew = pending.status === 'draft';\n      write(updated);\n      reply(cardMsg(updated, isNew ? '回診已建立' : '回診已更新'));\n    }\n  } else if (action === 'appt_menu') {\n    reply(menuCard());\n  } else if (action === 'appt_new') {\n    const draft = mine().find((a) => a.status === 'draft');\n    reply(askDate(draft ? draft.appt_id : 'new'));\n  } else if (action === 'appt_list') {\n    const list = mine().filter((a) => ACTIVE.includes(a.status) && a.date >= today)\n      .sort((x, y) => (x.date + x.session).localeCompare(y.date + y.session)).slice(0, 10);\n    if (!list.length) reply(textMsg('目前沒有安排中的回診。', [newBtn]));\n    else reply({ type: 'flex', altText: `你有 ${list.length} 筆回診`, contents: { type: 'carousel', contents: list.map((a) => card(a, '即將回診')) } });\n  } else if (action === 'appt_date') {\n    const date = normDate(ev.postback.params && ev.postback.params.date);\n    if (!date || date < today) {\n      reply(textMsg('回診日期不能早於今天，請重新選擇。'), askDate(id));\n    } else if (id === 'new' || (findMine(id) && findMine(id).status === 'draft')) {\n      const base = id === 'new' ? null : findMine(id);\n      const d = { appt_id: base ? base.appt_id : newId(), patient_id: pid, date, session: '', hospital: '', department: '', status: 'draft' };\n      write(d);\n      reply(askSession(d));\n    } else {\n      const a = findMine(id);\n      if (!a || !ACTIVE.includes(a.status)) reply(textMsg('這筆回診已取消或已改期，請輸入「我的回診」查看最新資料。'));\n      else if (a.date === date) reply(cardMsg(a, '回診日期沒有變更'));\n      else {\n        // 改期 = 取消舊的、建立新的（提醒紀錄以 appt_id 區分，才不會漏發）\n        write({ ...a, status: 'cancelled' });\n        const n = { ...a, appt_id: newId(), date, status: 'scheduled' };\n        write(n);\n        reply(cardMsg(n, '回診已改期'));\n      }\n    }\n  } else {\n    const a = findMine(id);\n    if (!a) { reply(textMsg('找不到這筆回診，請輸入「我的回診」查看。')); }\n    else if (a.status === 'cancelled') { reply(textMsg('這筆回診已取消或已改期，請輸入「我的回診」查看最新資料。')); }\n    else if (a.status !== 'draft' && a.date < today) { reply(textMsg('這筆回診日期已經過了，無法修改。', [newBtn])); }\n    else if (action === 'appt_session' || action === 'appt_time') {\n      const v = action === 'appt_time' ? s(ev.postback.params && ev.postback.params.time) : q.get('v');\n      if (action === 'appt_time' ? !isTime(v) : !SESSIONS.includes(v)) reply(askSession(a));\n      else if (action === 'appt_time' && a.date === today && v <= now.toFormat('HH:mm')) reply(askSession(a, '這個時間已經過了，請重新選擇'));\n      else if (a.status === 'draft') { write({ ...a, session: v }); reply(askHospital(`時間：${v}`)); }\n      else { const u = { ...a, session: v, status: 'scheduled' }; write(u); reply(cardMsg(u, '回診已更新')); }\n    } else if (a.status === 'draft') {\n      reply(textMsg('這筆回診還沒建立完成，請繼續上一步。'));\n    } else if (action === 'appt_edit') reply(editMenu(a));\n    else if (action === 'appt_pick_session') reply(askSession(a));\n    else if (action === 'appt_edit_hosp') { write({ ...a, status: 'edit_hospital' }); reply(askHospital(`目前：${place(a)}`)); }\n    else if (action === 'appt_cancel') {\n      reply(textMsg(`確定要取消 ${fmtDate(a.date)} ${a.session} ${place(a)} 的回診嗎？取消後就不會再提醒。`, [\n        pb('確定取消', `action=appt_cancel_ok&id=${a.appt_id}`), pb('保留', `action=appt_keep&id=${a.appt_id}`),\n      ]));\n    } else if (action === 'appt_cancel_ok') {\n      write({ ...a, status: 'cancelled' });\n      reply(textMsg(`已取消 ${fmtDate(a.date)} 的回診，不會再提醒。`, [newBtn]));\n    } else if (action === 'appt_keep') reply(cardMsg(a, '回診已保留'));\n    else continue;\n  }\n  if (msgs.length) out.push({ json: { kind: 'reply', replyToken: ev.replyToken, messages: msgs.slice(0, 5) } });\n}\nreturn out;\n"
+      },
+      "id": "72ae684b-8515-424e-9721-2819b0079e9e",
+      "name": "決定動作",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "numberOutputs": 2,
+        "output": "={{ $json.kind === 'write' ? 0 : 1 }}"
+      },
+      "id": "5f3902f7-9e8f-474d-be52-5dda38c9ee2e",
+      "name": "寫入或回覆",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1792,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify($json.row) }}",
+        "options": {}
+      },
+      "id": "3c2d96c9-dc0d-41ac-abfc-8b3059f0a7ed",
+      "name": "整理欄位",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2016,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_STAGING_APPT_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "appointments"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "appt_id"
+          ],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "bc2d7a89-df17-4eff-9d9a-d0175ae20abb",
+      "name": "寫入 appointments",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2240,
+        -160
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/reply",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ replyToken: $json.replyToken, messages: $json.messages }) }}",
+        "options": {}
+      },
+      "id": "ed9e9134-9b15-4efb-b8b6-d09aa83565e8",
+      "name": "Line 回覆",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2240,
+        32
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 寫入 appointments 失敗（重試 3 次後）才會跑到這裡。\n// Sheets 是整批寫入，失敗即視為這次所有寫入都沒成功。\nconst writes = $('決定動作').all().map(i => i.json).filter(j => j.kind === 'write');\nconst err = $input.first().json.error;\nconst errMsg = typeof err === 'string' ? err : (err && (err.message || JSON.stringify(err))) || '未知錯誤';\nconst tokens = [...new Set(writes.map(w => w.replyToken).filter(Boolean))];\nreturn tokens.map(t => ({ json: {\n  replyToken: t,\n  messages: [{ type: 'text', text: '⚠️ 回診資料儲存失敗，這次的變更沒有生效。\\n請稍後再試一次；若一直失敗請聯絡管理員。' }],\n  apptIds: writes.filter(w => w.replyToken === t).map(w => w.row && w.row.appt_id).filter(Boolean).join(', '),\n  errMsg: String(errMsg).slice(0, 300),\n} }));"
+      },
+      "id": "0d9f47c6-b2ca-4bfc-b5f1-80e356eda47d",
+      "name": "存檔失敗｜整理回覆",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/reply",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ replyToken: $json.replyToken, messages: $json.messages }) }}",
+        "options": {}
+      },
+      "id": "ff5d4cf9-a8b2-4f77-9406-aef4a95d85c1",
+      "name": "Line 回覆（存檔失敗）",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2688,
+        -256
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const writes = new Set($('決定動作').all().filter(i => i.json.kind === 'write').map(i => i.json.replyToken));\nreturn $input.all().filter(i => !writes.has(i.json.replyToken));"
+      },
+      "id": "e5c13c5a-b3b7-4f3c-ac2e-ec9ae6e11607",
+      "name": "排除存檔失敗的事件",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_STAGING_F1_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "FamilyPatients"
+        },
+        "options": {}
+      },
+      "id": "3b089904-9297-4869-8c9a-3aceb8e1375f",
+      "name": "讀取 FamilyPatients",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1120,
+        300
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_STAGING_F1_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Members"
+        },
+        "options": {}
+      },
+      "id": "cc9f43c1-685c-453a-8c0f-2176a0d154bc",
+      "name": "讀取 Members",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1320,
+        300
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "5c37e89e-c042-4ce3-8c26-763ccd9c6911",
+      "name": "確認寫入後回覆",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1900,
+        230
+      ],
+      "parameters": {
+        "jsCode": "const items = $('決定動作').all();\nconst writes = new Set(items.filter(i => i.json.kind === 'write').map(i => i.json.replyToken));\nreturn items.filter(i => i.json.kind === 'reply' && writes.has(i.json.replyToken));"
+      }
+    }
+  ],
+  "connections": {
+    "由主路由呼叫": {
+      "main": [
+        [
+          {
+            "node": "解析事件",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "解析事件": {
+      "main": [
+        [
+          {
+            "node": "讀取 appointments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "讀取 appointments": {
+      "main": [
+        [
+          {
+            "node": "讀取 FamilyPatients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "決定動作": {
+      "main": [
+        [
+          {
+            "node": "寫入或回覆",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "寫入或回覆": {
+      "main": [
+        [
+          {
+            "node": "整理欄位",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "排除存檔失敗的事件",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "整理欄位": {
+      "main": [
+        [
+          {
+            "node": "寫入 appointments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "排除存檔失敗的事件": {
+      "main": [
+        [
+          {
+            "node": "Line 回覆",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "寫入 appointments": {
+      "main": [
+        [
+          {
+            "node": "確認寫入後回覆",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "存檔失敗｜整理回覆",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "存檔失敗｜整理回覆": {
+      "main": [
+        [
+          {
+            "node": "Line 回覆（存檔失敗）",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Line 回覆": {
+      "main": [
+        [],
+        []
+      ]
+    },
+    "讀取 FamilyPatients": {
+      "main": [
+        [
+          {
+            "node": "讀取 Members",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "讀取 Members": {
+      "main": [
+        [
+          {
+            "node": "決定動作",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "確認寫入後回覆": {
+      "main": [
+        [
+          {
+            "node": "Line 回覆",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Taipei",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false
+  },
+  "pinData": {}
+}

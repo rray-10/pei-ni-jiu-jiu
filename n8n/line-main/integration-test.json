@@ -1,0 +1,520 @@
+{
+  "name": "Integration test | LINE main",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "integration-line-main",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        -48,
+        224
+      ],
+      "id": "d9961ab1-bbe9-403e-8b41-1b4dbccf9157",
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const events = $input.first().json.body?.events || [];\nreturn events.filter(event => event.source?.type === 'user' && event.source.userId && event.replyToken &&\n  (event.type === 'postback' && /(?:^|&)action=appt_/.test(event.postback?.data || '') ||\n   event.type === 'message' && event.message?.type === 'text'))\n  .map(event => ({json:{event,lineUid:event.source.userId,replyToken:event.replyToken,\n    keyword:event.type === 'message' ? event.message.text.trim() : '回診管理'}}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        224
+      ],
+      "id": "d44974d0-fabc-4f65-88e1-fceb0aa890e1",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_STAGING_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Members"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "lineUid",
+              "lookupValue": "={{ $json.lineUid }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        400,
+        224
+      ],
+      "id": "7a291988-d19f-402f-ba39-b8a958d31a9d",
+      "name": "Get row(s) in sheet",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "92d9af46-1e86-4095-b908-f11f39e6a1d3",
+              "leftValue": "={{ !!$json.familyId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        624,
+        224
+      ],
+      "id": "7c79d52f-b8de-46f7-8098-7505412cdbd3",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Code in JavaScript').item.json.keyword }}",
+                    "rightValue": "每日記錄",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "7a392790-5a46-4a6e-b1a2-67fe8bab0d96"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "daily_record"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "4af2a570-7d12-41d1-9665-1327db793f1f",
+                    "leftValue": "={{ $('Code in JavaScript').item.json.keyword }}",
+                    "rightValue": "健康摘要",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "view_records"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "79970ac2-7300-42b1-9e73-74cd29b6f21c",
+                    "leftValue": "={{ $('Code in JavaScript').item.json.keyword }}",
+                    "rightValue": "回診管理",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "appointment_reminder"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "b427dc20-3003-43bf-97ba-06204c92a16f",
+                    "leftValue": "={{ $('Code in JavaScript').item.json.keyword }}",
+                    "rightValue": "會員中心",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "member_center"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "bf47ac51-847b-41a9-bf8e-2b6f8e9893c1",
+                    "leftValue": "={{ $('Code in JavaScript').item.json.keyword }}",
+                    "rightValue": "用藥打卡",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "medication_checkin"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.5,
+      "position": [
+        848,
+        32
+      ],
+      "id": "5589a8a4-d9fc-4bab-bbe1-484e47363acc",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/reply",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({replyToken: $(\"Code in JavaScript\").item.json.replyToken, messages: [{type:\"text\",text:\"REPLACE_STAGING_DAILY_LIFF_URL\"}]}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1072,
+        -384
+      ],
+      "id": "23de9272-72db-47b0-9b92-710d9c68084a",
+      "name": "收到每日記錄"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/reply",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({replyToken: $(\"Code in JavaScript\").item.json.replyToken, messages: [{type:\"text\",text:\"REPLACE_STAGING_DASHBOARD_LIFF_URL\"}]}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1072,
+        -192
+      ],
+      "id": "33a665b7-ee98-4a29-bc96-8735ca7d1f31",
+      "name": "收到觀看紀錄"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/reply",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({replyToken:$json.replyToken,messages:[{type:\"text\",text:\"請先建立或加入家庭 \" + \"REPLACE_STAGING_BIND_LIFF_BASE\" + ({\"每日記錄\":\"?page=daily\",\"健康摘要\":\"?page=dashboard\",\"會員中心\":\"?page=member\",\"回診管理\":\"?page=appointments\",\"回診\":\"?page=appointments\"}[$json.keyword] || \"?page=bind\")}]}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        848,
+        352
+      ],
+      "id": "867ed6cd-1403-4c01-888c-20d81c4c452b",
+      "name": "沒有身分驗證，請加入或建立家庭"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/reply",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({replyToken: $(\"Code in JavaScript\").item.json.replyToken, messages: [{type:\"text\",text:\"REPLACE_STAGING_MEMBER_URL\"}]}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1072,
+        192
+      ],
+      "id": "f3cf0a7e-33e2-4be6-a9a9-e22636e0fd1e",
+      "name": "收到會員中心"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/reply",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({replyToken: $(\"Code in JavaScript\").item.json.replyToken, messages: [{type:\"text\",text:\"REPLACE_STAGING_MEDICATION_URL\"}]}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1072,
+        384
+      ],
+      "id": "a760acde-3d4d-472c-8638-9b5a2e676dab",
+      "name": "收到用藥打卡"
+    },
+    {
+      "id": "56986851-8a10-4ee2-8338-98197f2fe79b",
+      "name": "確認單一成員",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const input = $input.all();\nconst groups = new Map();\nfor (let i = 0; i < input.length; i++) {\n  const original = $('Code in JavaScript').itemMatching(i).json;\n  const key = original.event.webhookEventId || original.replyToken;\n  if (!groups.has(key)) groups.set(key,{original, rows:[], i});\n  if (input[i].json.lineUid === original.lineUid && input[i].json.familyId) groups.get(key).rows.push(input[i].json);\n}\nreturn [...groups.values()].map(({original,rows,i}) => ({\n  json:{...original, familyId:rows.length === 1 ? rows[0].familyId : ''},\n  pairedItem:{item:i}\n}));"
+      }
+    },
+    {
+      "id": "bdca1e02-cb57-4602-89dd-36abb2e405a0",
+      "name": "傳遞完整 LINE Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1020,
+        460
+      ],
+      "parameters": {
+        "jsCode": "return $input.all().map((item, index) => ({\n  json:{familyId:item.json.familyId,body:{events:[item.json.event]}},\n  pairedItem:{item:index}\n}));"
+      }
+    },
+    {
+      "id": "d78336e5-a3da-46f7-8af2-b3dcae915831",
+      "name": "交給 F3 回診",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1240,
+        460
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_F3_WORKFLOW_ID"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "確認單一成員",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "收到每日記錄",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "收到觀看紀錄",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "傳遞完整 LINE Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "收到會員中心",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "收到用藥打卡",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "傳遞完整 LINE Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "沒有身分驗證，請加入或建立家庭",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "確認單一成員": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "傳遞完整 LINE Event": {
+      "main": [
+        [
+          {
+            "node": "交給 F3 回診",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Taipei",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false
+  },
+  "pinData": {}
+}

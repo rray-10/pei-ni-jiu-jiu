@@ -1,0 +1,741 @@
+{
+  "name": "陪你久久 F1-A 健康欄位設定與每日紀錄",
+  "nodes": [
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "respond",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "update_write",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "record_write",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "依操作分流",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.response }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode || 200 }}"
+        }
+      },
+      "name": "回傳 JSON",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        896,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1O2LX5QwnQeVM_j7cnaSrZ3QxfkQuHfQ1UHc4GFRBG20",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "TrackingSettings",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "name": "儲存設定版本",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        64
+      ],
+      "notes": "Target n8n requires a configured Google Sheets OAuth credential; credential reference removed from this export."
+    },
+    {
+      "parameters": {
+        "jsCode": "const items=$('驗證身分並整理資料').all().filter(x=>x.json.route==='update_write').map(x=>x.json); if(!items.length)return[{json:{statusCode:500,response:{ok:false,error:'設定更新失敗'}}}]; const settings=Object.fromEntries(items.map(x=>[x.metricKey,x.enabled])); const defs=new Map($('讀取追蹤項目定義').all().map(x=>x.json).map(d=>[String(d.metricKey),d])); const metrics=items.map(item=>{const m={metricKey:item.metricKey,metricName:item.metricName,inputType:String(defs.get(item.metricKey)?.inputType||'number'),unit:item.unit||'',isActive:true,thresholdsSaved:true}; for(const f of ['alertLow','alertHigh','systolicLow','systolicHigh','diastolicLow','diastolicHigh','changeThreshold','systolicChangeThreshold','diastolicChangeThreshold']){const value=item[f];m[f]=value!==''&&value!==null&&value!==undefined&&Number.isFinite(Number(value))?Number(value):null;} return m;}); return[{json:{statusCode:200,response:{ok:true,familyId:items[0].familyId,role:'admin',metrics,settings}}}];"
+      },
+      "name": "組合設定回應",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1O2LX5QwnQeVM_j7cnaSrZ3QxfkQuHfQ1UHc4GFRBG20",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "DailyRecords",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "recordId",
+              "displayName": "recordId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "familyId",
+              "displayName": "familyId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "lineUid",
+              "displayName": "lineUid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "recordedAt",
+              "displayName": "recordedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "metricKey",
+              "displayName": "metricKey",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "metricName",
+              "displayName": "metricName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "value",
+              "displayName": "value",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "unit",
+              "displayName": "unit",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "note",
+              "displayName": "note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "createdAt",
+              "displayName": "createdAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "createdBy",
+              "displayName": "createdBy",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "寫入每日紀錄",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        256
+      ],
+      "notes": "Target n8n requires a configured Google Sheets OAuth credential; credential reference removed from this export."
+    },
+    {
+      "parameters": {
+        "jsCode": "const current = $('驗證身分並整理資料').all().map(x => x.json).filter(x => x.route === 'record_write');\nconst previous = $('查詢前日同項目紀錄（待接線）').all().map(x => x.json);\nconst defs = $('讀取追蹤項目定義').all().map(x => x.json);\nconst settings = $('讀取家庭追蹤設定').all().map(x => x.json);\nconst members = $('讀取家庭成員').all().map(x => x.json);\nconst first = current[0] || {};\nconst num = v => v === '' || v === null || v === undefined || !Number.isFinite(Number(v)) ? null : Number(v);\nconst warnings = [];\nfor (const row of current) {\n  const def = defs.find(x => String(x.metricKey) === String(row.metricKey)) || {};\n  const opts = settings.filter(x => String(x.familyId) === String(row.familyId) && String(x.metricKey) === String(row.metricKey)).sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')))[0] || {};\n  const prior = previous.find(x => String(x.metricKey) === String(row.metricKey) && String(x.period) === String(row.period) && String(x.memberId || x.lineUid) === String(row.memberId || row.lineUid));\n  if (!prior) continue;\n  const bp = String(row.metricKey) === 'blood_pressure' || String(def.inputType) === 'bloodPressure';\n  const fields = bp ? [['valueSystolic','systolicChangeThreshold','收縮壓'],['valueDiastolic','diastolicChangeThreshold','舒張壓']] : [['valueNumeric','changeThreshold',row.metricName || row.metricKey]];\n  for (const [valueField, thresholdField, label] of fields) {\n    const now = num(row[valueField] ?? (bp ? String(row.value||'').split('/')[valueField==='valueSystolic'?0:1] : row.value));\n    const before = num(prior[valueField] ?? (bp ? String(prior.value||'').split('/')[valueField==='valueSystolic'?0:1] : prior.value));\n    const threshold = num(opts[thresholdField]);\n    if (now === null || before === null || threshold === null) continue;\n    const delta = now - before;\n    if (Math.abs(delta) >= threshold) warnings.push({ metricKey: row.metricKey, metricName: row.metricName, label, previous: before, current: now, delta, threshold, unit: row.unit || '', period: row.period, recordDate: row.recordDate, memberId: row.memberId, recordId: row.recordId, familyId: row.familyId });\n  }\n}\nconst recipients = warnings.length ? [...new Set([String(first.lineUid || ''), ...members.filter(m => String(m.familyId || '') === String(first.familyId || '') && String(m.role || '').toLowerCase() === 'admin').map(m => String(m.lineUid || ''))].filter(Boolean))] : [];\nconst alertRows = warnings.map(w => ({ json: { alertId: w.recordId + '-' + w.metricKey, familyId: w.familyId, memberId: w.memberId, recordId: w.recordId, previousRecordId: '', metricKey: w.metricKey, metricName: w.metricName, alertType: 'two_day_change', period: w.period, recordDate: w.recordDate, previousValue: w.previous, currentValue: w.current, difference: w.delta, threshold: w.threshold, unit: w.unit, notificationStatus: 'queued', notificationAt: '', createdAt: new Date().toISOString() } }));\nreturn [{ json: { statusCode: 200, response: { ok: true, savedCount: current.length, recordedAt: first.recordedAt || new Date().toISOString(), recordDate: first.recordDate || '', period: first.period || '', warnings }, recipients, alertRows } }];"
+      },
+      "name": "組合紀錄回應",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1O2LX5QwnQeVM_j7cnaSrZ3QxfkQuHfQ1UHc4GFRBG20",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "DailyRecords",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "familyId",
+              "lookupValue": "={{ $('驗證身分並整理資料').first().json.familyId }}"
+            },
+            {
+              "lookupColumn": "recordDate",
+              "lookupValue": "={{ new Date(Date.parse($('驗證身分並整理資料').first().json.recordDate + 'T12:00:00Z') - 86400000).toISOString().slice(0,10) }}"
+            },
+            {
+              "lookupColumn": "period",
+              "lookupValue": "={{ $('驗證身分並整理資料').first().json.period }}"
+            }
+          ]
+        },
+        "options": {
+          "returnFirstMatch": true
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        256
+      ],
+      "name": "查詢前日同項目紀錄（待接線）",
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "notes": "Target n8n requires a configured Google Sheets OAuth credential; credential reference removed from this export."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "23a24ef9-e32f-4dbb-a243-6b80c58b4792",
+              "leftValue": "={{ $json.response.warnings.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        896,
+        304
+      ],
+      "name": "判斷是否需推播 LINE OA"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/multicast",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=={{ { to: $json.recipients, messages: [{ type: \"text\", text: \"有一筆健康紀錄達到兩日變化提醒條件，請返回「陪你久久」查看。\" }] } }}",
+        "options": {
+          "response": {
+            "response": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        208
+      ],
+      "name": "推播 LINE OA（患者與管理者）",
+      "onError": "continueRegularOutput",
+      "notes": "Target n8n requires a configured LINE OA credential; credential reference removed from this export."
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.first().json.alertRows || [];\nreturn rows.map((row) => ({ json: row }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        400
+      ],
+      "name": "展開提醒事件資料"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1O2LX5QwnQeVM_j7cnaSrZ3QxfkQuHfQ1UHc4GFRBG20",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "RecordAlerts",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "alertId",
+              "displayName": "alertId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "familyId",
+              "displayName": "familyId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "memberId",
+              "displayName": "memberId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "recordId",
+              "displayName": "recordId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "previousRecordId",
+              "displayName": "previousRecordId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "metricKey",
+              "displayName": "metricKey",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "metricName",
+              "displayName": "metricName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "alertType",
+              "displayName": "alertType",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "period",
+              "displayName": "period",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "recordDate",
+              "displayName": "recordDate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "previousValue",
+              "displayName": "previousValue",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "currentValue",
+              "displayName": "currentValue",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "difference",
+              "displayName": "difference",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "threshold",
+              "displayName": "threshold",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "unit",
+              "displayName": "unit",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notificationStatus",
+              "displayName": "notificationStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notificationAt",
+              "displayName": "notificationAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "createdAt",
+              "displayName": "createdAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "recipientMemberId",
+              "displayName": "recipientMemberId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1344,
+        400
+      ],
+      "name": "寫入提醒事件",
+      "onError": "continueRegularOutput",
+      "notes": "Target n8n requires a configured Google Sheets OAuth credential; credential reference removed from this export."
+    }
+  ],
+  "connections": {
+    "依操作分流": {
+      "main": [
+        [
+          {
+            "node": "回傳 JSON",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "儲存設定版本",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "寫入每日紀錄",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "儲存設定版本": {
+      "main": [
+        [
+          {
+            "node": "組合設定回應",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "組合設定回應": {
+      "main": [
+        [
+          {
+            "node": "回傳 JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "寫入每日紀錄": {
+      "main": [
+        [
+          {
+            "node": "查詢前日同項目紀錄（待接線）",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "組合紀錄回應": {
+      "main": [
+        [
+          {
+            "node": "回傳 JSON",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "判斷是否需推播 LINE OA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "查詢前日同項目紀錄（待接線）": {
+      "main": [
+        [
+          {
+            "node": "組合紀錄回應",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "判斷是否需推播 LINE OA": {
+      "main": [
+        [
+          {
+            "node": "推播 LINE OA（患者與管理者）",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "展開提醒事件資料",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "展開提醒事件資料": {
+      "main": [
+        [
+          {
+            "node": "寫入提醒事件",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": [],
+  "active": false
+}

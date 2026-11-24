@@ -1,0 +1,477 @@
+{
+  "name": "Integration test | F3 reminders",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "0ff52d30-5835-4c48-9bcf-f0298913e975",
+      "name": "每天 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 20 * * *"
+            }
+          ]
+        }
+      },
+      "id": "b613636a-422e-4735-b58d-402cd03508ca",
+      "name": "每天 20:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ad02a856-458b-428f-8662-caae0fabbc28",
+              "name": "LIFF_SUMMARY_URL",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "13f9b6df-3361-4c53-8edb-bc9b60d08836",
+              "name": "MODE",
+              "value": "={{ $now.setZone('Asia/Taipei').hour < 15 ? 'morning' : 'evening' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "9efe0f7a-ca78-4d00-b7b1-d8571e392330",
+      "name": "提醒設定",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_STAGING_APPT_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "appointments"
+        },
+        "options": {}
+      },
+      "id": "42cbc75f-2e6a-4dcd-a92a-af3a0d57825c",
+      "name": "提醒｜讀取 appointments",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        448
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_STAGING_APPT_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "notification_log"
+        },
+        "options": {}
+      },
+      "id": "edd7e23a-9ae9-4102-aedf-1d31554957c5",
+      "name": "提醒｜讀取 notification_log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1344,
+        448
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "// F3 回診提醒：找出今天該發的提醒（09:00 → 前 7/3/1 天；20:00 → 回診當天晚上記醫囑）\nconst cfg = $('提醒設定').first().json;\nconst clean = (name) => $(name).all().map(i => i.json).filter(r => r && Object.keys(r).length > 0);\nconst appts = clean('提醒｜讀取 appointments');\nconst members = clean('提醒｜讀取 Members');\nconst families = clean('提醒｜讀取 Families');\nconst links = clean('提醒｜讀取 FamilyPatients');\nconst logs = clean('提醒｜讀取 notification_log');\n\nconst TZ = 'Asia/Taipei';\nconst WEEK = ['一', '二', '三', '四', '五', '六', '日'];\nconst BLUE = '#1E6FD9';\nconst s = (v) => (v === undefined || v === null ? '' : String(v).trim());\nfunction normDate(v) {\n  if (typeof v === 'number') return DateTime.fromISO('1899-12-30', { zone: TZ }).plus({ days: v }).toISODate();\n  const dt = DateTime.fromISO(s(v).replace(/\\//g, '-'), { zone: TZ });\n  return dt.isValid ? dt.toISODate() : s(v);\n}\nconst today = s(cfg.TEST_TODAY)\n  ? DateTime.fromISO(s(cfg.TEST_TODAY), { zone: TZ }).startOf('day')\n  : DateTime.now().setZone(TZ).startOf('day');\nconst mode = s(cfg.MODE) || 'morning';\nconst offsets = mode === 'evening' ? [0] : [7, 3, 1];\n\nconst uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);\n});\nconst alreadySent = (apptId, userId, offset) => logs.some((l) =>\n  s(l.appt_id) === apptId && s(l.user_id) === userId && s(l.channel) === 'line' &&\n  Number(l.offset_days) === offset && s(l.status) === 'sent');\n\nfunction fmtDate(d) {\n  const dt = DateTime.fromISO(d, { zone: TZ });\n  return `${dt.toFormat('M/d')}（${WEEK[dt.weekday - 1]}）`;\n}\n\nfunction reminder(a, offset, patientName, isFamily) {\n  const who = isFamily && patientName ? `${patientName}` : '你';\n  const place = `${a.hospital} ${a.department}`.trim();\n  if (offset === 0) {\n    return [{ type: 'text', text: `${isFamily ? patientName + '今天' : '今天'}看診辛苦了！\\n醫師交代了什麼？\\n請留存這次看診的醫囑。` }];\n  }\n  const title = offset === 1 ? '明天要回診' : `${offset} 天後要回診`;\n  const bubble = {\n    type: 'bubble',\n    header: { type: 'box', layout: 'vertical', backgroundColor: BLUE, paddingAll: '16px', contents: [\n      { type: 'text', text: `回診提醒：${title}`, color: '#FFFFFF', size: 'lg', weight: 'bold', wrap: true },\n    ] },\n    body: { type: 'box', layout: 'vertical', spacing: 'md', contents: [\n      ...(isFamily ? [{ type: 'text', text: `${who}的回診`, size: 'md', color: '#555555' }] : []),\n      { type: 'text', text: fmtDate(a.date), size: 'xxl', weight: 'bold', color: '#222222' },\n      { type: 'text', text: /^\\d{2}:\\d{2}$/.test(a.session) ? `時間 ${a.session}` : (a.session || '—'), size: 'lg', color: '#222222' },\n      { type: 'text', text: place, size: 'lg', color: '#222222', wrap: true },\n      ...(offset === 1 ? [{ type: 'text', text: '記得帶健保卡', size: 'md', color: '#555555', margin: 'md' }] : []),\n    ] },\n  };\n  if (offset === 1 && s(cfg.LIFF_SUMMARY_URL)) {\n    bubble.footer = { type: 'box', layout: 'vertical', contents: [\n      { type: 'button', style: 'primary', color: BLUE, height: 'md', action: { type: 'uri', label: '出示摘要', uri: s(cfg.LIFF_SUMMARY_URL) } },\n    ] };\n  }\n  return [{ type: 'flex', altText: `回診提醒：${title}，${fmtDate(a.date)} ${a.session} ${place}`, contents: bubble }];\n}\n\nconst out = [];\nfor (const raw of appts) {\n  const a = { appt_id: s(raw.appt_id), patient_id: s(raw.patient_id), date: normDate(raw.date),\n    session: s(raw.session), hospital: s(raw.hospital), department: s(raw.department), status: s(raw.status) };\n  if (!['scheduled', 'edit_hospital'].includes(a.status)) continue;\n  const dt = DateTime.fromISO(a.date, { zone: TZ });\n  if (!dt.isValid) continue;\n  const offset = Math.round(dt.startOf('day').diff(today, 'days').days);\n  if (!offsets.includes(offset)) continue;\n\n  if (!a.appt_id || !a.patient_id) continue;\n  const matches = links.filter(r => s(r.patientId) === a.patient_id);\n  if (matches.length !== 1 || !s(matches[0].familyId)) continue;\n  const familyId = s(matches[0].familyId);\n  if (links.filter(r => s(r.familyId) === familyId).length !== 1) continue;\n  const family = families.filter(r => s(r.familyId) === familyId);\n  if (family.length !== 1) continue;\n  const patientName = s(family[0].patientName);\n  const recipients = members.filter(r => s(r.familyId) === familyId && s(r.lineUid) &&\n    members.filter(m => s(m.lineUid) === s(r.lineUid)).length === 1);\n  const seen = new Set();\n  for (const r of recipients) {\n    const uid = s(r.lineUid), to = uid;\n    if (!to || seen.has(uid)) continue;\n    seen.add(uid);\n    if (alreadySent(a.appt_id, uid, offset)) continue;\n    out.push({ json: {\n      to, retryKey: uuid(),\n      messages: reminder(a, offset, patientName, true),\n      log: { appt_id: a.appt_id, user_id: uid, channel: 'line', offset_days: offset },\n    } });\n  }\n}\nreturn out;\n"
+      },
+      "id": "d7a33579-84e8-4033-a177-d6f7bee1ffc2",
+      "name": "組合推播",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/push",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Line-Retry-Key",
+              "value": "={{ $json.retryKey }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ to: $json.to, messages: $json.messages }) }}",
+        "options": {}
+      },
+      "id": "42fbe90d-55b2-41b4-bb6b-b4bd459d913b",
+      "name": "Line 推播",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1792,
+        448
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ ...$('組合推播').item.json.log, status: 'sent', sent_at: $now.setZone('Asia/Taipei').toISO({ suppressMilliseconds: true }) }) }}",
+        "options": {}
+      },
+      "id": "016b1d7a-b328-438b-b8db-90e6f2480695",
+      "name": "記錄成功",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2016,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ ...$('組合推播').item.json.log, status: 'failed', sent_at: $now.setZone('Asia/Taipei').toISO({ suppressMilliseconds: true }) }) }}",
+        "options": {}
+      },
+      "id": "0077a7c7-26fc-4874-93c1-cb67ea80b21a",
+      "name": "記錄失敗",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2016,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_STAGING_APPT_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "notification_log"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "bd34242f-450d-4338-a647-919778c0c216",
+      "name": "寫入 notification_log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2240,
+        352
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_STAGING_F1_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Members"
+        },
+        "options": {}
+      },
+      "id": "ae7f2acf-aef1-4d69-82a5-1740561b58f8",
+      "name": "提醒｜讀取 Members",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        448
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_STAGING_F1_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Families"
+        },
+        "options": {}
+      },
+      "id": "ac0ae90a-0f8f-4571-8025-3e56b319b97b",
+      "name": "提醒｜讀取 Families",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        448
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_STAGING_F1_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "FamilyPatients"
+        },
+        "options": {}
+      },
+      "id": "045eb6b1-9036-4c87-8bfa-3d0a1cbac107",
+      "name": "提醒｜讀取 FamilyPatients",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        448
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "connections": {
+    "每天 09:00": {
+      "main": [
+        [
+          {
+            "node": "提醒設定",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "每天 20:00": {
+      "main": [
+        [
+          {
+            "node": "提醒設定",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "提醒設定": {
+      "main": [
+        [
+          {
+            "node": "提醒｜讀取 appointments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "提醒｜讀取 appointments": {
+      "main": [
+        [
+          {
+            "node": "提醒｜讀取 Members",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "提醒｜讀取 notification_log": {
+      "main": [
+        [
+          {
+            "node": "組合推播",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "組合推播": {
+      "main": [
+        [
+          {
+            "node": "Line 推播",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Line 推播": {
+      "main": [
+        [
+          {
+            "node": "記錄成功",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "記錄失敗",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "記錄成功": {
+      "main": [
+        [
+          {
+            "node": "寫入 notification_log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "記錄失敗": {
+      "main": [
+        [
+          {
+            "node": "寫入 notification_log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "提醒｜讀取 Members": {
+      "main": [
+        [
+          {
+            "node": "提醒｜讀取 Families",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "提醒｜讀取 Families": {
+      "main": [
+        [
+          {
+            "node": "提醒｜讀取 FamilyPatients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "提醒｜讀取 FamilyPatients": {
+      "main": [
+        [
+          {
+            "node": "提醒｜讀取 notification_log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Taipei",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false
+  },
+  "pinData": {}
+}
