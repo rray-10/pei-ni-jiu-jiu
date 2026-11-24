@@ -14,6 +14,8 @@ test('member, daily, dashboard and appointment routes share a binding gate', () 
     assert.match(markup,/id="joinFamily"/);
     assert.match(markup,/id="chooseStart"/);
     assert.match(markup,/id="chooseJoin"/);
+    assert.match(markup,/id="chooseProxy"/);
+    assert.match(markup,/id="switchPanel"/);
     assert.equal(markup.match(/\/liff\/edge\/2\/sdk.js/g).length,1);
   }
 });
@@ -85,6 +87,56 @@ test('self-binding provisions an idempotent family and patient and permits a sin
   assert.equal(preview.preview.patientName,'含資料');
   assert.equal(run('fixture-viewer','memberStatus').bound,false);
   assert.throws(() => run('fixture-viewer','previewInvite',{inviteCode:invite}),/邀請碼無效/);
+
+  // member list, promote, remove
+  run('fixture-m1','joinFamily',{inviteCode:second,lineName:'小明'});
+  const list = run('fixture-profile','listMembers',{lineName:'阿芮'}).members;
+  assert.equal(list.length,2);
+  assert.equal(list.filter(item => item.isSelf).length,1);
+  assert.ok(list.every(item => /^[0-9a-f]{16}$/.test(item.key)));
+  assert.equal(JSON.stringify(list).includes('fixture-'),false);
+  assert.equal(list.find(item => !item.isSelf).displayName,'小明');
+  const m1key = list.find(item => !item.isSelf).key;
+  assert.throws(() => run('fixture-m1','removeMember',{memberKey:m1key}),/只有家庭管理者/);
+  assert.throws(() => run('fixture-m1','promoteMember',{memberKey:m1key}),/只有家庭管理者/);
+  assert.throws(() => run('fixture-profile','removeMember',{memberKey:'0'.repeat(16)}),/找不到/);
+  assert.equal(run('fixture-profile','removeMember',{memberKey:m1key})._unlinkUid,'fixture-m1');
+  assert.equal(run('fixture-m1','memberStatus').bound,false);
+  const third = run('fixture-profile','createInvite').inviteCode;
+  run('fixture-m1','joinFamily',{inviteCode:third});
+  run('fixture-profile','promoteMember',{memberKey:m1key});
+  assert.equal(run('fixture-m1','listMembers').members.every(item => item.role === 'admin'),true);
+  assert.throws(() => run('fixture-profile','promoteMember',{memberKey:m1key}),/已經是管理者/);
+
+  // another admin exists now, so the first admin may leave
+  assert.equal(run('fixture-profile','unbind').unbound,true);
+  const fourth = run('fixture-m1','createInvite').inviteCode;
+
+  // already-bound account receiving an invite: preview + switch
+  run('fixture-switch','createFamily',{patientName:'我自己'});
+  const peek = run('fixture-switch','previewInvite',{inviteCode:fourth});
+  assert.equal(peek.bound,true);
+  assert.equal(peek.current.patientName,'我自己');
+  assert.equal(peek.preview.patientName,'含資料');
+  assert.equal(peek.switchBlocked,'');
+  const switched = run('fixture-switch','switchFamily',{inviteCode:fourth});
+  assert.equal(switched.patientName,'含資料');
+  assert.equal(switched.role,'member');
+  assert.equal(tables.Members.filter(row => row[1] === 'fixture-switch').length,1);
+  assert.throws(() => run('fixture-switch','previewInvite',{inviteCode:fourth}),/已經是這個家庭/);
+
+  // admin with other (non-admin) members cannot switch away
+  run('fixture-lead','createFamily',{patientName:'帶頭'});
+  run('fixture-follow','joinFamily',{inviteCode:run('fixture-lead','createInvite').inviteCode});
+  const fifth = run('fixture-m1','createInvite').inviteCode;
+  assert.match(run('fixture-lead','previewInvite',{inviteCode:fifth}).switchBlocked,/其他成員/);
+  assert.throws(() => run('fixture-lead','switchFamily',{inviteCode:fifth}),/其他成員/);
+  assert.equal(run('fixture-lead','memberStatus').patientName,'帶頭');
+
+  // proxy creation needs explicit consent
+  assert.throws(() => run('fixture-proxy','createFamily',{patientName:'代建',proxy:true}),/同意/);
+  assert.equal(run('fixture-proxy','createFamily',{patientName:'代建',proxy:true,consent:true}).role,'admin');
+  assert.equal(tables.Families[0].includes('createdFor'),true);
 });
 
 test('legacy migration uses exact identity and rejects a shared patient ID without writing', () => {

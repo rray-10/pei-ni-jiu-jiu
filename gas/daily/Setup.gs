@@ -8,8 +8,8 @@ function setupStagingSpreadsheet() {
   const existing = props.getProperty('F1_SPREADSHEET_ID');
   if (existing) throw new Error('F1_SPREADSHEET_ID already set: ' + existing);
   const tabs = {
-    Families: 'familyId,patientName,note,birthYear,conditions,allergies',
-    Members: 'familyId,lineUid,role',
+    Families: 'familyId,patientName,note,birthYear,conditions,allergies,createdFor',
+    Members: 'familyId,lineUid,role,displayName,joinedAt',
     FamilyPatients: 'familyId,patientId',
     FamilyInvites: 'codeHash,familyId,expiresAt,claimedBy',
     MetricDefinitions: 'metricKey,metricName,inputType,unit,isActive',

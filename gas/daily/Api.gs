@@ -3,6 +3,7 @@ const F1_THRESHOLDS = ['alertLow','alertHigh','systolicLow','systolicHigh','dias
   'changeThreshold','systolicChangeThreshold','diastolicChangeThreshold'];
 const f1Text_ = value => String(value == null ? '' : value).trim();
 const f1Bool_ = value => value === true || /^true$/i.test(f1Text_(value));
+let f1LastName_ = '';
 function f1Fail_(message) { throw new Error('F1:' + message); }
 
 function f1Identity_(token, channelId) {
@@ -13,8 +14,10 @@ function f1Identity_(token, channelId) {
   if (String(verified.client_id) !== channelId || !(verified.expires_in > 0)) f1Fail_('LINE 登入憑證無效');
   const profile = UrlFetchApp.fetch('https://api.line.me/v2/profile', {headers:{Authorization:'Bearer ' + token},muteHttpExceptions:true});
   if (profile.getResponseCode() !== 200) f1Fail_('無法取得 LINE 身分');
-  const uid = JSON.parse(profile.getContentText()).userId;
+  const parsed = JSON.parse(profile.getContentText());
+  const uid = parsed.userId;
   if (!uid) f1Fail_('無法取得 LINE 身分');
+  f1LastName_ = f1Text_(parsed.displayName).slice(0,40);
   return uid;
 }
 
@@ -150,20 +153,23 @@ function f1Request_(body) {
   let lock;
   let out;
   let menuTask;
+  let unlinkUid;
   try {
 
     const memberAction = MEMBER_ACTIONS.includes(body.action);
     if (!memberAction && !['read','record','update'].includes(body.action)) f1Fail_('操作無效');
     const props = PropertiesService.getScriptProperties();
     const uid = f1Identity_(body.accessToken,props.getProperty('LINE_LOGIN_CHANNEL_ID'));
-    if (!['read','memberStatus','previewInvite','syncMenu'].includes(body.action)) {
+    body = {...body,lineName:f1LastName_};
+    if (!['read','memberStatus','previewInvite','listMembers','syncMenu'].includes(body.action)) {
       lock = LockService.getScriptLock();
       lock.waitLock(10000);
     }
     const ss = SpreadsheetApp.openById(props.getProperty('F1_SPREADSHEET_ID'));
     if (memberAction) {
       out = membership_(ss,uid,body);
-      if (out.bound && ['createFamily','joinFamily','syncMenu'].includes(body.action)) menuTask = {uid,props};
+      if (out.bound && ['createFamily','joinFamily','switchFamily','syncMenu'].includes(body.action)) menuTask = {uid,props};
+      if (out._unlinkUid) { unlinkUid = out._unlinkUid; delete out._unlinkUid; }
       if (out.unbound) menuTask = {uid,props,unlink:true};
     } else {
       const ctx = f1Context_(ss,uid);
@@ -183,6 +189,7 @@ function f1Request_(body) {
   } finally {
     if (lock && lock.hasLock()) lock.releaseLock();
   }
+  if (unlinkUid && out.ok) unlinkMemberMenu_(unlinkUid,PropertiesService.getScriptProperties());
   if (menuTask && out.ok) out.menu = menuTask.unlink ? unlinkMemberMenu_(menuTask.uid,menuTask.props) : syncMemberMenu_(menuTask.uid,menuTask.props);
   return out;
 }
