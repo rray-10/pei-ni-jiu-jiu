@@ -9,6 +9,8 @@ const values = Object.fromEntries(process.argv.slice(2).map(arg => {
   const index = arg.indexOf('=');
   return index < 1 ? [arg, ''] : [arg.slice(0, index), arg.slice(index + 1)];
 }));
+// The care workbook is referenced by two placeholder names; one value fills both.
+if (values.STAGING_SPREADSHEET_ID && !values.STAGING_F1_SPREADSHEET_ID) values.STAGING_F1_SPREADSHEET_ID = values.STAGING_SPREADSHEET_ID;
 const root = path.join(__dirname, '..', 'n8n');
 const out = path.join(root, 'import');
 fs.mkdirSync(out, {recursive: true});

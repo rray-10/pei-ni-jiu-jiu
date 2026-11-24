@@ -2,7 +2,14 @@
 window.hubSession = (async () => {
   const cfg = window.MEMBER_CONFIG;
   const $ = id => document.getElementById(id);
-  const status = (text, kind = '') => { const el = $('memberStatus'); el.textContent = text; el.className = kind; };
+  const status = (text, kind = '') => {
+    const el = $('memberStatus');
+    el.textContent = text;
+    el.className = kind;
+    const friendUrl = cfg.links['回到 LINE 官方帳號'];
+    $('addFriend').hidden = !(kind === 'error' && /加入官方帳號/.test(text) && friendUrl);
+    if (friendUrl) $('addFriend').href = friendUrl;
+  };
   const icon = name => '<svg class="ico" aria-hidden="true"><use href="#i-' + name + '"></use></svg>';
   const linkIcons = {'健康摘要':'chart','每日紀錄':'edit','會員中心':'people'};
   try {

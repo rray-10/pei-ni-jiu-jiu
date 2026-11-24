@@ -89,7 +89,8 @@ clasp pull                    # 把遠端內容拉回本機（先確認不會蓋
 | `APPT_SPREADSHEET_ID` | 選 | 選 | 回診試算表。可執行 `setupStagingAppointments()` 建立 |
 | `DEV_AUTH_ENABLED` | | `false` | 必須是 false |
 | `LIFF_ID` | ✔ | | 建 Rich Menu 按鈕連結用 |
-| `LINE_OA_ACCESS_TOKEN` | 選 | | 測試 OA 的 Messaging API token，僅 Rich Menu 切換需要 |
+| `LINE_OA_ACCESS_TOKEN` | 選 | | 測試 OA 的 Messaging API token，Rich Menu 切換與好友檢查需要 |
+| `REQUIRE_OA_FRIEND` | 選 | | 設為 `true` 時，建立／加入／切換家庭前會檢查使用者是否已加官方帳號好友（需要 `LINE_OA_ACCESS_TOKEN`） |
 | `RICH_MENU_UNBOUND_IMAGE_FILE_ID` / `RICH_MENU_BOUND_IMAGE_FILE_ID` | 選 | | Drive 圖片 ID，供 `createRichMenus()` 上傳 |
 | `UNBOUND_RICH_MENU_ID` / `BOUND_RICH_MENU_ID` | 選 | | 由 `createRichMenus()` 寫入 |
 
@@ -128,7 +129,8 @@ repo 內的 n8n 檔保留 `REPLACE_*` 佔位符（不放真實 ID）。匯入前
 ```bash
 node scripts/prepare-n8n-import.js \
   STAGING_BIND_LIFF_BASE=https://liff.line.me/<LIFF_ID> \
-  STAGING_SPREADSHEET_ID=<照護測試表 ID> STAGING_APPT_SPREADSHEET_ID=<回診測試表 ID>
+  STAGING_SPREADSHEET_ID=<照護測試表 ID> STAGING_APPT_SPREADSHEET_ID=<回診測試表 ID> \
+  STAGING_F1_GAS_EXEC_URL=<Daily /exec>   # 只有 F1 relay 需要
 ```
 
 OA webhook 流程：LINE → Render `/line/events`（用 `LINE_MESSAGING_CHANNEL_SECRET` 驗簽章）→ n8n 主流程 webhook（`LINE_MAIN_WEBHOOK_URL`，帶 `X-Hub-Gateway-Key: LINE_WEBHOOK_GATEWAY_KEY`）。三個值都只填在 Render 後台；n8n 的 webhook 用 Header Auth 憑證設同一把 key。
