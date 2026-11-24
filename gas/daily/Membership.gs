@@ -152,9 +152,11 @@ function memberFamily_(ss, familyId) {
   return {patientId:linked[0].patientId,patientName:families[0].patientName};
 }
 
+const memberMenuId_ = value => /^richmenu-[0-9a-f]{32}$/.test(String(value || '')) ? value : '';
+
 function unlinkMemberMenu_(uid, props) {
   const token = props.getProperty('LINE_OA_ACCESS_TOKEN');
-  if (!token || !props.getProperty('UNBOUND_RICH_MENU_ID')) return 'unconfigured';
+  if (!token || !memberMenuId_(props.getProperty('UNBOUND_RICH_MENU_ID'))) return 'unconfigured';
   try {
     // Removing the per-user link makes LINE fall back to the OA default (unbound) menu.
     const response = UrlFetchApp.fetch('https://api.line.me/v2/bot/user/' + encodeURIComponent(uid) + '/richmenu',
@@ -166,7 +168,7 @@ function unlinkMemberMenu_(uid, props) {
 }
 
 function syncMemberMenu_(uid, props) {
-  const menu = props.getProperty('BOUND_RICH_MENU_ID');
+  const menu = memberMenuId_(props.getProperty('BOUND_RICH_MENU_ID'));
   const token = props.getProperty('LINE_OA_ACCESS_TOKEN');
   if (!menu || !token) return 'unconfigured';
   try {

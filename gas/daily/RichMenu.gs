@@ -10,27 +10,34 @@
  *   UNBOUND_RICH_MENU_ID              OA default menu (everyone who is not bound)
  *   BOUND_RICH_MENU_ID                linked per user after binding, unlinked on unbind
  *
- * Image size must be exactly 2500x843 or 2500x1686 px (JPEG/PNG, <= 1 MB).
  */
-const RICH_MENU_HEIGHT = 843;
-
+/**
+ * Layout follows the design files in Drive "01｜產品素材":
+ *   unbound: rich_menu_unbound_v2_2500x843.png   (2 buttons)
+ *   bound:   rich_menu_bound_v2_2500x1686.png    (5 buttons)
+ * If you swap the images, adjust the bounds below. LINE accepts 2500x843 or 2500x1686, JPEG/PNG, up to 1 MB.
+ */
 function richMenuDefinitions_(liffId) {
   const liff = page => 'https://liff.line.me/' + liffId + (page ? '/?page=' + page : '');
-  const area = (index, count, action) => ({
-    bounds: {x: Math.round(2500 / count * index), y: 0, width: Math.round(2500 / count), height: RICH_MENU_HEIGHT},
-    action
-  });
+  const uri = (label, page) => ({type: 'uri', label, uri: liff(page)});
+  const text = label => ({type: 'message', label, text: label});
+  const area = (x, y, width, height, action) => ({bounds: {x, y, width, height}, action});
   return {
     unbound: {
-      size: {width: 2500, height: RICH_MENU_HEIGHT}, selected: true, name: 'unbound-v1', chatBarText: '綁定家人',
-      areas: [area(0, 1, {type: 'uri', label: '綁定家人', uri: liff('bind')})]
+      size: {width: 2500, height: 843}, selected: true, name: 'unbound-v2', chatBarText: '綁定家人',
+      areas: [
+        area(0, 300, 1617, 543, text('介紹陪你久久')),        // handled by n8n (reply with an intro message)
+        area(1617, 300, 883, 543, uri('建立照護家庭', 'bind'))
+      ]
     },
     bound: {
-      size: {width: 2500, height: RICH_MENU_HEIGHT}, selected: true, name: 'bound-v1', chatBarText: '陪你久久',
+      size: {width: 2500, height: 1686}, selected: true, name: 'bound-v2', chatBarText: '陪你久久',
       areas: [
-        area(0, 3, {type: 'uri', label: '每日紀錄', uri: liff('daily')}),
-        area(1, 3, {type: 'uri', label: '健康摘要', uri: liff('')}),
-        area(2, 3, {type: 'message', label: '回診管理', text: '回診管理'})
+        area(0, 398, 800, 1288, text('用藥打卡')),            // handled by n8n (medication check-in, not built yet)
+        area(800, 398, 817, 592, uri('每日記錄', 'daily')),
+        area(1617, 398, 883, 592, text('回診管理')),           // handled by n8n F3
+        area(800, 990, 817, 696, uri('健康摘要', '')),
+        area(1617, 990, 883, 696, uri('會員中心', 'member'))
       ]
     }
   };

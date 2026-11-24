@@ -101,3 +101,22 @@ test('legacy migration uses exact identity and rejects a shared patient ID witho
   assert.equal(conflict.ready.length,0);
   assert.equal(conflict.unresolved.every(row => row.reason === 'patient_shared_by_families'),true);
 });
+
+test('rich menu areas fit inside the design images and do not overlap', () => {
+  const context = vm.createContext({});
+  vm.runInContext(readFileSync('gas/daily/RichMenu.gs','utf8'),context);
+  const defs = context.richMenuDefinitions_('2012665607-test');
+  for (const menu of [defs.unbound,defs.bound]) {
+    assert.ok([843,1686].includes(menu.size.height) && menu.size.width === 2500);
+    for (const [i,a] of menu.areas.entries()) {
+      const b = a.bounds;
+      assert.ok(b.x >= 0 && b.y >= 0 && b.x + b.width <= menu.size.width && b.y + b.height <= menu.size.height);
+      for (const other of menu.areas.slice(i + 1).map(item => item.bounds)) {
+        assert.ok(b.x + b.width <= other.x || other.x + other.width <= b.x || b.y + b.height <= other.y || other.y + other.height <= b.y);
+      }
+    }
+  }
+  assert.equal(defs.unbound.areas[1].action.uri,'https://liff.line.me/2012665607-test/?page=bind');
+  assert.equal(defs.bound.areas[3].action.uri,'https://liff.line.me/2012665607-test');
+  assert.equal(defs.bound.areas[4].action.uri,'https://liff.line.me/2012665607-test/?page=member');
+});
