@@ -1,6 +1,6 @@
 'use strict';
 const http = require('node:http');
-const { createHmac, timingSafeEqual } = require('node:crypto');
+const { createHmac, timingSafeEqual, randomBytes } = require('node:crypto');
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
 
@@ -87,6 +87,17 @@ function validSignature(body, signature, secret) {
 function createServer(env = process.env, fetcher = fetch) {
   const endpoint = https(env.LIFF_ENDPOINT);
   if (!endpoint || !env.LIFF_ID) throw new Error('LIFF_ENDPOINT and LIFF_ID are required');
+  // Short-lived PDF hand-off: LINE's in-app browser cannot save blob: downloads, so the PDF is served from a random one-use-window URL.
+  const pdfs = new Map();
+  const PDF_TTL_MS = 3 * 60 * 1000;
+  const storePdf = (filename, bytes) => {
+    const now = Date.now();
+    for (const [key, item] of pdfs) if (item.expires < now) pdfs.delete(key);
+    if (pdfs.size >= 50) pdfs.delete(pdfs.keys().next().value);
+    const id = randomBytes(16).toString('hex');
+    pdfs.set(id, {filename, bytes, expires: now + PDF_TTL_MS});
+    return id;
+  };
   const upstreams = {
     '/api/daily': https(env.F1_API_URL),
     '/api/member': https(env.MEMBER_GAS_URL || env.F1_API_URL),
@@ -104,6 +115,14 @@ function createServer(env = process.env, fetcher = fetch) {
       if (req.method === 'GET' && url.pathname === new URL(endpoint).pathname) {
         const page = url.searchParams.get('page');
         return send(200, 'text/html; charset=utf-8', render(page, env));
+      }
+      const pdfMatch = req.method === 'GET' && /^\/pdf\/([0-9a-f]{32})$/.exec(url.pathname);
+      if (pdfMatch) {
+        const item = pdfs.get(pdfMatch[1]);
+        if (!item || item.expires < Date.now()) return json(404, {ok:false});
+        res.writeHead(200, {'Content-Type':'application/pdf','Content-Length':item.bytes.length,'Cache-Control':'no-store',
+          'Content-Disposition':"attachment; filename*=UTF-8''" + encodeURIComponent(item.filename),'X-Content-Type-Options':'nosniff'});
+        return res.end(item.bytes);
       }
       if (req.method !== 'POST' || !Object.hasOwn(upstreams, url.pathname)) return json(404, {ok:false});
       const upstream = upstreams[url.pathname];
@@ -131,6 +150,11 @@ function createServer(env = process.env, fetcher = fetch) {
       if (payload && payload.detail !== undefined) {
         console.error(url.pathname, payload.error, payload.detail); // diagnostics stay server-side
         delete payload.detail;
+      }
+      const generated = url.pathname === '/api/dashboard' && payload && payload.ok && payload.data && typeof payload.data.base64 === 'string';
+      if (generated) {
+        const id = storePdf(String(payload.data.filename || 'summary.pdf'), Buffer.from(payload.data.base64, 'base64'));
+        return json(result.status, {ok:true,data:{filename:payload.data.filename,url:new URL('/pdf/' + id, endpoint).href}});
       }
       return json(result.status, payload);
     } catch {
