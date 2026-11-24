@@ -76,3 +76,14 @@ function checkUserRichMenu(uid) {
   const token = PropertiesService.getScriptProperties().getProperty('LINE_OA_ACCESS_TOKEN');
   console.log(JSON.stringify(richMenuCall_(token, 'get', 'https://api.line.me/v2/bot/user/' + encodeURIComponent(uid) + '/richmenu')));
 }
+
+/**
+ * Manual check: is this LINE user an OA friend? Run from the editor with the userId (Members.lineUid) as argument.
+ * 200 = friend, 404 = not a friend or blocked. A 404 for everybody usually means the OA token belongs to a different Provider.
+ */
+function checkUserFriend(uid) {
+  const props = PropertiesService.getScriptProperties();
+  const response = UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/' + encodeURIComponent(uid),
+    {headers: {Authorization: 'Bearer ' + props.getProperty('LINE_OA_ACCESS_TOKEN')}, muteHttpExceptions: true});
+  console.log('REQUIRE_OA_FRIEND=' + props.getProperty('REQUIRE_OA_FRIEND') + ' status=' + response.getResponseCode() + ' ' + response.getContentText().slice(0, 120));
+}

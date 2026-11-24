@@ -7,8 +7,8 @@ window.hubSession = (async () => {
     el.textContent = text;
     el.className = kind;
     const friendUrl = cfg.links['回到 LINE 官方帳號'];
-    $('addFriend').hidden = !(kind === 'error' && /加入官方帳號/.test(text) && friendUrl);
     if (friendUrl) $('addFriend').href = friendUrl;
+    if (kind === 'error' && /加入官方帳號/.test(text) && friendUrl) $('addFriend').hidden = false;
   };
   const icon = name => '<svg class="ico" aria-hidden="true"><use href="#i-' + name + '"></use></svg>';
   const linkIcons = {'健康摘要':'chart','每日紀錄':'edit','會員中心':'people'};
@@ -62,6 +62,13 @@ window.hubSession = (async () => {
       }
       showFamily(data);
       return false;
+    }
+    // Proactive prompt: works only when the LINE Login channel is linked to the OA; otherwise liff.getFriendship() throws and we stay silent
+    // (the server still enforces friendship when REQUIRE_OA_FRIEND=true).
+    const friendUrl = cfg.links['回到 LINE 官方帳號'];
+    async function checkFriend() {
+      if (!friendUrl || typeof liff.getFriendship !== 'function') return;
+      try { $('addFriend').hidden = (await liff.getFriendship()).friendFlag !== false; } catch (_) { /* OA not linked */ }
     }
     const invited = new URLSearchParams(location.search).get('invite');
     const validInvite = /^[a-f0-9]{32}$/i.test(invited || '');
@@ -167,6 +174,8 @@ window.hubSession = (async () => {
     if (data.bound) return finish(data);
     $('onboarding').hidden = false;
     $('memberHeading').textContent = '綁定照護家庭';
+    checkFriend();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) checkFriend(); });
     const show = id => {
       for (const name of ['choose','startFamily','joinFamily']) $(name).hidden = name !== id;
     };
