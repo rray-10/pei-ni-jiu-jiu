@@ -118,6 +118,18 @@ clasp pull                    # 把遠端內容拉回本機（先確認不會蓋
 
 設定步驟：填好 Daily 的屬性後，在編輯器執行 `createRichMenus()`。圖片須為 2500×843（或 2500×1686）px。要調整按鈕，改 `RichMenu.gs` 的 `richMenuDefinitions_()` 後重跑（舊選單可在 LINE 後台刪除）。
 
+## 接 n8n（匯入前填佔位符）
+
+repo 內的 n8n 檔保留 `REPLACE_*` 佔位符（不放真實 ID）。匯入前先產生填好的副本（輸出到被忽略的 `n8n/import/`）：
+
+```bash
+node scripts/prepare-n8n-import.js \
+  STAGING_BIND_LIFF_BASE=https://liff.line.me/<LIFF_ID> \
+  STAGING_SPREADSHEET_ID=<照護測試表 ID> STAGING_APPT_SPREADSHEET_ID=<回診測試表 ID>
+```
+
+OA webhook 流程：LINE → Render `/line/events`（用 `LINE_MESSAGING_CHANNEL_SECRET` 驗簽章）→ n8n 主流程 webhook（`LINE_MAIN_WEBHOOK_URL`，帶 `X-Hub-Gateway-Key: LINE_WEBHOOK_GATEWAY_KEY`）。三個值都只填在 Render 後台；n8n 的 webhook 用 Header Auth 憑證設同一把 key。
+
 ## 測試部署順序
 
 詳細步驟與驗收見 [docs/integration-audit.md](docs/integration-audit.md)。精簡版：

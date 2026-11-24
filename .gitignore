@@ -22,3 +22,6 @@ coverage/
 
 # Local handoff files can contain live identifiers and data
 /file/陪你久久_Menu抽換的功能_PoC-說明文件.pdf
+
+# n8n import copies with real IDs filled in
+n8n/import/
