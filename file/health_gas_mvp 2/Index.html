@@ -1,0 +1,9 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>陪你久久｜健康摘要</title><?!= include('Styles'); ?></head><body>
+<header><div class="brand">🌿 陪你久久 <small>照護小幫手</small></div><span class="demo">DEMO · 虛構資料</span></header>
+<main><div id="message" class="message" hidden></div><section id="loading" class="center">正在讀取資料…</section><section id="app" hidden>
+<div class="top"><div><p class="eyebrow">HEALTH OVERVIEW</p><h1>健康儀表板</h1></div><button id="summaryBtn" class="outline">就診摘要 →</button></div>
+<div class="patient"><label for="patient">目前照護對象</label><select id="patient"></select><p id="roleHint">以下資料僅供測試。</p></div>
+<div id="dashboard"><div class="cards"><article><p>最近一次血壓</p><strong id="latestBP">—</strong><small id="latestTime">尚無紀錄</small></article><article><p>期間平均血壓</p><strong id="avgBP">—</strong><small id="avgGlucose">血糖平均 —</small></article><article><p>用藥回報率</p><strong id="medRate">—</strong><small id="medCount">—</small></article><article><p>下次回診</p><strong id="nextVisit">—</strong><small id="visitDetail">尚無回診</small></article></div>
+<div class="panel"><div class="switch" id="metricTabs"><button data-metric="bp" class="active">血壓</button><button data-metric="glucose">血糖</button><button data-metric="med">用藥</button></div><div class="switch subtle" id="periodTabs"><button data-days="7" class="active">7 天</button><button data-days="30">30 天</button><button data-days="90">90 天</button></div><h2 id="chartTitle">血壓趨勢</h2><div id="chart" class="chart"></div><p id="chartNote" class="note"></p></div>
+</div><div id="summary" hidden><button id="backBtn" class="back">← 返回儀表板</button><h2>就診摘要</h2><p class="note">使用者自行記錄，僅供就診時參考，非醫療診斷。</p><div id="summaryBody"></div><button id="pdfBtn" class="primary full">下載 PDF 摘要</button></div>
+</section></main><footer>陪你久久 · 健康紀錄展示版 · 請勿輸入真實個資</footer><?!= include('Scripts'); ?></body></html>
