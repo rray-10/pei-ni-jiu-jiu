@@ -23,8 +23,11 @@ function render(page, env) {
   const titled = markup => markup.replace(/<title>[^<]*<\/title>/,'').replace('</head>','<title>陪你久久｜' + titles[page] + '</title></head>');
   const member = readFileSync(path.join(__dirname,'member.html'),'utf8');
   const controller = readFileSync(path.join(__dirname,'member.js'),'utf8');
+  const hubNav = page === 'dashboard' || page === 'summary';
   const shell = '<style>html{background:#f7faf6}body{margin:0;background:#f7faf6;font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;color:#25362e}' +
-    '.sidebar,.menu-btn,.scrim,.content>header,.daily-nav,.wrap>.brand{display:none!important}.content{margin-left:0!important}</style>';
+    (hubNav ? '.content>header .brand{display:none}.content>header{display:flex;align-items:center;min-height:52px;padding:4px 8px}'
+            : '.sidebar,.menu-btn,.scrim,.content>header,.daily-nav,.wrap>.brand{display:none!important}.content{margin-left:0!important}') +
+    '</style>';
   const gate = '<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>' + shell + member +
     '<script>window.MEMBER_CONFIG=' + scriptJSON({liffId:env.LIFF_ID,page,module:!portal,links:{
       '健康摘要':base,'每日紀錄':base+'?page=daily','會員中心':base+'?page=member',
