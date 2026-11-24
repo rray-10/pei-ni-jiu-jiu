@@ -87,3 +87,24 @@ function checkUserFriend(uid) {
     {headers: {Authorization: 'Bearer ' + props.getProperty('LINE_OA_ACCESS_TOKEN')}, muteHttpExceptions: true});
   console.log('REQUIRE_OA_FRIEND=' + props.getProperty('REQUIRE_OA_FRIEND') + ' status=' + response.getResponseCode() + ' ' + response.getContentText().slice(0, 120));
 }
+
+/**
+ * No-argument diagnostic for the editor "Run" button: checks the OA friendship of every row in Members.
+ * Logs a masked userId, role and the LINE status code (200 = friend, 404 = not a friend / blocked).
+ */
+function checkMembersFriendStatus() {
+  const props = PropertiesService.getScriptProperties();
+  const token = props.getProperty('LINE_OA_ACCESS_TOKEN');
+  const values = SpreadsheetApp.openById(props.getProperty('F1_SPREADSHEET_ID')).getSheetByName('Members').getDataRange().getValues();
+  const headers = values.shift();
+  const uidCol = headers.indexOf('lineUid');
+  const roleCol = headers.indexOf('role');
+  console.log('REQUIRE_OA_FRIEND=' + props.getProperty('REQUIRE_OA_FRIEND'));
+  values.forEach(row => {
+    const uid = String(row[uidCol] || '');
+    if (!uid) return;
+    const response = UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/' + encodeURIComponent(uid),
+      {headers: {Authorization: 'Bearer ' + token}, muteHttpExceptions: true});
+    console.log(uid.slice(0, 4) + '…' + uid.slice(-4) + ' role=' + row[roleCol] + ' status=' + response.getResponseCode());
+  });
+}
