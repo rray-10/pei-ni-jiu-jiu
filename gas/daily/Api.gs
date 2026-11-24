@@ -84,6 +84,14 @@ function f1Record_(ss, body, ctx, catalog, uid, now) {
     if (!(bp || (def.inputType === 'boolean' ? typeof value === 'boolean' : def.inputType !== 'bloodPressure' && numeric))) {
       f1Fail_('紀錄格式不正確');
     }
+    if (bp) {
+      const sys = Number(bp[1]), dia = Number(bp[2]);
+      if (sys < 50 || sys > 260 || dia < 30 || dia > 180 || sys <= dia) f1Fail_('血壓數值不合理，請確認「收縮壓／舒張壓」是否填對（收縮壓 50–260、舒張壓 30–180，且收縮壓要大於舒張壓）');
+    }
+    if (key === 'blood_glucose' && numeric) {
+      const [low, high] = /mmol/i.test(def.unit) ? [1.1, 33.3] : [20, 600];
+      if (value < low || value > high) f1Fail_('血糖數值不合理，請確認數字與單位（' + (def.unit || 'mg/dL') + ' 範圍 ' + low + '–' + high + '）');
+    }
     return {recordId:[ctx.familyId,uid,body.requestId,key].join(':'),familyId:ctx.familyId,patientId:ctx.patientId,lineUid:uid,recordedAt:now,
       metricKey:key,metricName:def.metricName,value,unit:def.unit,note:f1Text_(body.note).slice(0,500),
       source:'LIFF',recordDate:date,period:body.period,valueNumeric:numeric ? value : '',

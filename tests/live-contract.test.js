@@ -128,6 +128,10 @@ test('F1 GAS POST writes live headers, dedupes retries, and dashboard POST scope
   assert.equal(post(f1Files,body).savedCount,2);
   assert.equal(post(f1Files,body,'rpc').savedCount,2);
   assert.equal(post(f1Files,{action:'createFamily'},'rpc').ok,false);
+  const badBp = post(f1Files,{...body,requestId:'00000000-0000-4000-8000-000000000009',values:{blood_pressure:'222/258'}});
+  assert.equal(badBp.ok,false);
+  assert.match(badBp.error,/血壓數值不合理/);
+  assert.equal(post(f1Files,{...body,requestId:'00000000-0000-4000-8000-00000000000a',values:{blood_glucose:900}}).ok,false);
   assert.equal(rows.DailyRecords.length,3);
   assert.equal(rows.DailyRecords[1][1],'fixture-a');
   const dashboard = post(dashFiles,{action:'getHubData',idToken:'x.x.a'}).data.dashboard;
@@ -164,4 +168,25 @@ test('F3 reminder selects only the authorized family and skips a previously sent
   tables['提醒｜讀取 FamilyPatients'].push({familyId:'F_OTHER',patientId:'P_TEST'});
   assert.deepEqual(run(),[]);
   assert.equal(workflow.active,false);
+});
+
+test('generated PDF is handed off through a short-lived download URL instead of base64', async () => {
+  const pdf = Buffer.from('%PDF-1.4 fixture');
+  const server = createServer({...env,DASHBOARD_GAS_URL:'https://script.google.com/macros/s/fixture/exec'}, async () => new Response(JSON.stringify({ok:true,data:{filename:'摘要.pdf',base64:pdf.toString('base64')}})));
+  await new Promise(resolve => server.listen(0,resolve));
+  const base = 'http://127.0.0.1:' + server.address().port;
+  try {
+    const response = await fetch(base + '/api/dashboard',{method:'POST',headers:{'Content-Type':'application/json',Origin:new URL(env.LIFF_ENDPOINT).origin},
+      body:JSON.stringify({action:'generateVisitPdf',idToken:'x'})});
+    const result = await response.json();
+    assert.equal(result.ok,true);
+    assert.equal(result.data.base64,undefined);
+    const path = new URL(result.data.url).pathname;
+    assert.match(path,/^\/pdf\/[0-9a-f]{32}$/);
+    const download = await fetch(base + path);
+    assert.equal(download.headers.get('content-type'),'application/pdf');
+    assert.match(download.headers.get('content-disposition'),/attachment; filename\*=UTF-8''/);
+    assert.equal(Buffer.from(await download.arrayBuffer()).equals(pdf),true);
+    assert.equal((await fetch(base + '/pdf/' + '0'.repeat(32))).status,404);
+  } finally { server.close(); }
 });
