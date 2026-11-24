@@ -50,6 +50,14 @@ window.hubSession = (async () => {
       try {
         const result = await api('createInvite');
         $('inviteCode').textContent = result.inviteCode;
+        const link = 'https://liff.line.me/' + cfg.liffId + '/?page=bind&invite=' + result.inviteCode;
+        $('inviteLink').textContent = link;
+        $('shareInvite').href = 'https://line.me/R/msg/text/?' + encodeURIComponent('邀請你加入「' + data.patientName + '」的照護家庭（24 小時內、限用一次）：' + link);
+        $('copyInvite').onclick = async () => {
+          try { await navigator.clipboard.writeText(link); status('已複製邀請連結'); }
+          catch { status('請長按上方連結複製'); }
+        };
+        $('inviteShare').hidden = false;
         status('請私下交給一位家人。邀請碼 24 小時內只能使用一次。');
       } catch (err) { status(err.message); }
       finally { $('invite').disabled = false; }
@@ -90,6 +98,7 @@ window.hubSession = (async () => {
       status('請選擇為自己建立家庭，或輸入家人提供的邀請碼。');
     };
     reset();
+    const invited = new URLSearchParams(location.search).get('invite');
     return await new Promise(resolve => {
       const complete = async (action, fields) => {
         disable(true);
@@ -155,6 +164,12 @@ window.hubSession = (async () => {
         } catch (err) { status(err.message); }
         finally { disable(false); }
       };
+      if (invited && /^[a-f0-9]{32}$/i.test(invited)) {
+        show('joinFamily');
+        step('joinFamily','joinStep1');
+        $('joinFamily').elements.inviteCode.value = invited;
+        $('joinFamily').requestSubmit();
+      }
     });
   } catch (err) {
     status(err.message || '無法確認 LINE 與家庭身分');
