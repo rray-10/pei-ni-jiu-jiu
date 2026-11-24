@@ -1,6 +1,6 @@
 /**
  * health-adapter — F1 DailyRecords / 回診 Appointments → 儀表板統一格式。
- * 同一份原始碼同時給 Node (tests) 與 GAS 使用（GAS 版由 scripts/sync-gas.sh 複製為 gas/shared/health-adapter.gs）。
+ * 同一份原始碼同時給 Node (tests) 與 GAS 使用（GAS 版由 scripts/sync-gas.sh 複製為 gas/dashboard/health-adapter.gs）。
  * 不得在此檔放任何密鑰或真實資料。
  */
 var HealthAdapter = (function () {
@@ -99,10 +99,15 @@ var HealthAdapter = (function () {
    */
   function normalizeDailyRecord(row) {
     var quality = [];
-    var recordedAt = isBlank(row.recordedAt) ? null : String(row.recordedAt);
+    var stamp = isBlank(row.recordedAt) ? '' : String(row.recordedAt).trim();
+    if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(stamp)) {
+      stamp = stamp.replace(' ', 'T') + '+08:00';
+    }
+    var timestamp = Date.parse(stamp);
+    var recordedAt = isNaN(timestamp) ? null : new Date(timestamp).toISOString();
     var recordDate = !isBlank(row.recordDate) ? String(row.recordDate).slice(0, 10) : (recordedAt ? taipeiDate(recordedAt) : null);
     if (isBlank(row.recordDate)) quality.push('recordDate_derived');
-    var key = String(row.metricKey || '');
+    var key = String(row.metricKey || '').trim();
     var rec = {
       recordId: String(row.recordId || ''),
       familyId: String(row.familyId || ''),
@@ -122,7 +127,9 @@ var HealthAdapter = (function () {
     if (isBlank(row.unit) && DEFAULT_UNITS[key]) quality.push('unit_defaulted');
 
     if (key === 'blood_pressure') {
-      var bp = parseBloodPressure(row.value);
+      var hasParts = !isBlank(row.valueSystolic) && !isBlank(row.valueDiastolic);
+      var bp = parseBloodPressure(hasParts ? row.valueSystolic + '/' + row.valueDiastolic : row.value);
+      if (rec.unit.toLowerCase() !== 'mmhg') bp = { ok: false, reason: 'unit' };
       if (bp.ok) { rec.systolic = bp.systolic; rec.diastolic = bp.diastolic; }
       else { rec.valid = false; quality.push('bp_' + bp.reason); }
     } else if (key === 'medication') {
@@ -130,7 +137,14 @@ var HealthAdapter = (function () {
       if (m.ok) { rec.taken = m.taken; rec.total = m.total; }
       else { rec.valid = false; quality.push('med_' + m.reason); }
     } else {
-      var num = parseNumber(row.value, key);
+      var value = isBlank(row.valueNumeric) ? row.value : row.valueNumeric;
+      var unit = rec.unit.trim().toLowerCase();
+      if (key === 'blood_glucose' && unit === 'mmol/l' && !isBlank(value)) value = Number(value) * 18.0182;
+      var num = parseNumber(value, key);
+      if (key === 'blood_glucose') {
+        if (unit !== 'mg/dl' && unit !== 'mmol/l') num = { ok: false, reason: 'unit' };
+        rec.unit = 'mg/dL';
+      }
       if (num.ok) rec.value = num.value;
       else { rec.valid = false; quality.push('num_' + num.reason); }
     }
@@ -153,7 +167,8 @@ var HealthAdapter = (function () {
 
   /** 回診 appointments 一列 → 統一格式。日期以台北日曆日為準。 */
   function normalizeAppointment(row) {
-    var date = isBlank(row.date) ? null : String(row.date).slice(0, 10);
+    var date = isBlank(row.date) ? null : typeof row.date === 'number'
+      ? addDays('1899-12-30', Math.floor(row.date)) : String(row.date).trim().slice(0, 10).replace(/\//g, '-');
     var status = String(row.status || '').toLowerCase();
     return {
       appointmentId: String(row.appt_id || row.appointment_id || ''),
@@ -162,7 +177,7 @@ var HealthAdapter = (function () {
       session: isBlank(row.session) ? '' : String(row.session),
       hospital: isBlank(row.hospital) ? '' : String(row.hospital),
       department: isBlank(row.department) ? '' : String(row.department),
-      status: status === 'cancelled' || status === 'canceled' ? 'cancelled' : (status === 'scheduled' ? 'scheduled' : (status || 'unknown')),
+      status: status === 'cancelled' || status === 'canceled' ? 'cancelled' : ((status === 'scheduled' || status === 'edit_hospital') ? 'scheduled' : (status || 'unknown')),
       valid: !!(date && /^\d{4}-\d{2}-\d{2}$/.test(date))
     };
   }

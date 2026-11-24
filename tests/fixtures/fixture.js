@@ -10,7 +10,7 @@ const members = [
   { familyId: 'F_TEST_A', lineUid: 'U_TEST_A2', role: 'member' },
   { familyId: 'F_TEST_B', lineUid: 'U_TEST_B1', role: 'admin' }
 ];
-const familyPatients = [{ familyId: 'F_TEST_B', patientId: 'p_b' }]; // A 未設定 → 預設 pt_F_TEST_A
+const familyPatients = [{ familyId: 'F_TEST_A', patientId: 'pt_F_TEST_A' }, { familyId: 'F_TEST_B', patientId: 'p_b' }];
 
 let n = 0;
 const rec = (o) => Object.assign({

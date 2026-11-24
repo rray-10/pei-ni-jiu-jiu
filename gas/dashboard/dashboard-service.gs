@@ -5,7 +5,7 @@
  */
 var DashboardService = (function () {
   'use strict';
-  var A = (typeof require === 'function') ? require('./health-adapter.js') : HealthAdapter;
+  function adapter() { return typeof require === 'function' ? require('./health-adapter.js') : HealthAdapter; }
 
   var ALLOWED_DAYS = [7, 30, 90];
 
@@ -16,22 +16,24 @@ var DashboardService = (function () {
     if (!lineUid) throw fail('UNAUTHENTICATED', '缺少已驗證的身分');
     var rows = members.filter(function (m) { return String(m.lineUid) === String(lineUid); });
     if (!rows.length) throw fail('NOT_MEMBER', '尚未加入任何照護家庭');
-    var fams = {};
-    rows.forEach(function (r) { fams[r.familyId] = true; });
-    if (Object.keys(fams).length > 1) throw fail('DATA_INTEGRITY', '同一使用者綁定多個家庭，請聯絡管理員');
+    if (!String(rows[0].familyId || '').trim() || rows.length !== 1) throw fail('DATA_INTEGRITY', '同一使用者綁定多個家庭，請聯絡管理員');
     return { familyId: rows[0].familyId, role: rows[0].role || 'member' };
   }
 
-  /** family → patientId。優先用 FamilyPatients 對照表；無則採預設 'pt_' + familyId（見 docs/data-mapping.md） */
+  /** family → patientId。使用 FamilyPatients 的唯一對照 */
   function patientIdFor(src, familyId) {
-    var link = (src.familyPatients || []).filter(function (r) { return r.familyId === familyId; })[0];
-    return link ? link.patientId : 'pt_' + familyId;
+    var links = (src.familyPatients || []).filter(function (r) { return r.familyId === familyId; });
+    if (links.length !== 1 || !links[0].patientId || src.familyPatients.some(function (r) {
+      return r.familyId !== familyId && r.patientId === links[0].patientId;
+    })) throw fail('DATA_INTEGRITY', '照護對象對照缺漏或有衝突');
+    return links[0].patientId;
   }
 
   function getSessionContext(src, lineUid) {
     var m = resolveMembership(src.members, lineUid);
-    var fam = (src.families || []).filter(function (f) { return f.familyId === m.familyId; })[0];
-    if (!fam) throw fail('DATA_INTEGRITY', '找不到家庭主檔');
+    var families = (src.families || []).filter(function (f) { return f.familyId === m.familyId; });
+    if (families.length !== 1) throw fail('DATA_INTEGRITY', '家庭主檔缺漏或重複');
+    var fam = families[0];
     var pid = patientIdFor(src, m.familyId);
     return {
       familyId: m.familyId,
@@ -43,6 +45,7 @@ var DashboardService = (function () {
   function avg(a) { return a.length ? Math.round(a.reduce(function (s, x) { return s + x; }, 0) / a.length) : null; }
 
   function getDashboardData(src, lineUid, patientId, days, nowIso) {
+    var A = adapter();
     days = Number(days);
     if (ALLOWED_DAYS.indexOf(days) < 0) throw fail('BAD_REQUEST', '期間無效');
     var ctx = getSessionContext(src, lineUid);
@@ -53,7 +56,7 @@ var DashboardService = (function () {
     var from = A.addDays(today, -(days - 1));
 
     var all = (src.dailyRecords || [])
-      .filter(function (r) { return String(r.familyId) === ctx.familyId; })
+      .filter(function (r) { return String(r.familyId) === ctx.familyId && (!r.patientId || r.patientId === pid); })
       .map(A.normalizeDailyRecord);
     var excluded = { test: 0, invalid: 0 };
     var usable = [];
@@ -63,12 +66,12 @@ var DashboardService = (function () {
       usable.push(r);
     });
     usable = A.dedupe(usable).filter(function (r) { return r.recordDate >= from && r.recordDate <= today; });
-    usable.sort(function (a, b) { return a.recordedAt < b.recordedAt ? -1 : a.recordedAt > b.recordedAt ? 1 : 0; });
+    usable.sort(function (a, b) { return a.recordDate.localeCompare(b.recordDate) || a.recordedAt.localeCompare(b.recordedAt); });
 
     var bp = usable.filter(function (r) { return r.metricKey === 'blood_pressure'; })
-      .map(function (r) { return { measured_at: r.recordedAt, systolic: r.systolic, diastolic: r.diastolic, unit: r.unit }; });
+      .map(function (r) { return { measured_at: r.recordedAt, record_date: r.recordDate, systolic: r.systolic, diastolic: r.diastolic, unit: r.unit }; });
     var glucose = usable.filter(function (r) { return r.metricKey === 'blood_glucose'; })
-      .map(function (r) { return { measured_at: r.recordedAt, value: r.value, unit: r.unit, context: r.period || '' }; });
+      .map(function (r) { return { measured_at: r.recordedAt, record_date: r.recordDate, value: r.value, unit: r.unit, context: r.period || '' }; });
     var meds = usable.filter(function (r) { return r.metricKey === 'medication'; });
     var taken = meds.reduce(function (s, r) { return s + r.taken; }, 0);
     var total = meds.reduce(function (s, r) { return s + r.total; }, 0);
@@ -80,7 +83,7 @@ var DashboardService = (function () {
 
     var fam = (src.families || []).filter(function (f) { return f.familyId === ctx.familyId; })[0];
     return {
-      patient: { id: pid, name: fam.patientName || '被照護者', birthYear: '未填寫', conditions: '', allergies: '' },
+      patient: { id: pid, name: fam.patientName || '被照護者', birthYear: fam.birthYear || '未填寫', conditions: fam.conditions || '', allergies: fam.allergies || '' },
       familyId: ctx.familyId,
       days: days,
       latestBP: bp.length ? bp[bp.length - 1] : null,
