@@ -1,0 +1,23 @@
+# Render Blueprint for the staging LIFF host. Values marked sync:false are entered in the Render dashboard (never committed).
+services:
+  - type: web
+    name: pei-ni-jiu-jiu-staging
+    runtime: node
+    plan: free
+    branch: integration/f1-live
+    buildCommand: echo "no build step"
+    startCommand: npm start
+    healthCheckPath: /?page=bind
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: LIFF_ID
+        sync: false
+      - key: LIFF_ENDPOINT
+        sync: false
+      - key: MEMBER_GAS_URL
+        sync: false
+      - key: F1_API_URL
+        sync: false
+      - key: DASHBOARD_GAS_URL
+        sync: false

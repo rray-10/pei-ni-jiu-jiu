@@ -4,13 +4,14 @@ let chromium; try { ({ chromium } = require('playwright')); } catch (e) { /* ski
 const { NOW, src } = require('./fixtures/fixture.js');
 const D = (f) => fs.readFileSync(path.join(__dirname, '..', 'gas', 'dashboard', f), 'utf8');
 const SHOTS = process.env.SHOT_DIR;
+const browserOptions = process.env.PLAYWRIGHT_CHROME_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROME_PATH } : {};
 
 function renderTemplate(config) {
   const evalTpl = (t) => t
     .replace(/<\?!= include\('(\w+)'\) \?>/g, (_, n) => evalTpl(D(n + '.html')))
     .replace(/<\?!= JSON\.stringify\(config\)[^?]*\?>/g, () => JSON.stringify(config).replace(/</g, '\\u003c'))
     .replace(/<\? if \(config\.liffId\) \{ \?>.*?<\? \} \?>/g, '')
-    .replace(/<\?= config\.nav\.(\w+) \|\| '#' \?>/g, (_, k) => config.nav[k] || '#')
+    .replace(/<\?= config\.nav\.(\w+) \|\| '([^']*)' \?>/g, (_, k, fallback) => config.nav[k] || fallback)
     .replace(/<\?= config\.nav\.(\w+) \? '' : 'disabled' \?>/g, (_, k) => config.nav[k] ? '' : 'disabled');
   return evalTpl(D('Index.html'));
 }
@@ -31,7 +32,7 @@ async function open(browser, viewport, uid, srcOverride, config) {
 const cfg = { page: 'dashboard', liffId: '', devMode: true, nav: { daily: 'https://example.test/daily', member: '', medication: '' } };
 
 test('桌面：側欄固定、儀表板顯示 F1 資料', { skip: !chromium }, async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch(browserOptions);
   try {
     const { page, errors } = await open(browser, { width: 1280, height: 800 }, 'U_TEST_A1', null, cfg);
     await page.waitForSelector('#app:not([hidden])');
@@ -49,23 +50,24 @@ test('桌面：側欄固定、儀表板顯示 F1 資料', { skip: !chromium }, a
   } finally { await browser.close(); }
 });
 test('手機：drawer 開關、無橫向捲動', { skip: !chromium }, async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch(browserOptions);
   try {
     const { page, errors } = await open(browser, { width: 375, height: 700 }, 'U_TEST_A1', null, cfg);
     await page.waitForSelector('#app:not([hidden])');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
     assert.equal(await page.isVisible('#menuBtn'), true);
     assert.equal((await page.locator('#sidebar').boundingBox()).x < 0, true);
-    await page.click('#menuBtn'); await page.waitForTimeout(300);
-    assert.equal((await page.locator('#sidebar').boundingBox()).x >= 0, true);
+    await page.click('#menuBtn');
+    assert.equal(await page.locator('#menuBtn').getAttribute('aria-expanded'), 'true', JSON.stringify(errors));
+    await page.waitForFunction(() => document.getElementById('sidebar').getBoundingClientRect().left >= -0.5);
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'mobile-drawer.png') });
-    await page.keyboard.press('Escape'); await page.waitForTimeout(300);
-    assert.equal((await page.locator('#sidebar').boundingBox()).x < 0, true);
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.getElementById('sidebar').getBoundingClientRect().right <= 0.5);
     assert.deepEqual(errors, []);
   } finally { await browser.close(); }
 });
 test('狀態：未綁定使用者顯示錯誤訊息；空資料顯示「—」', { skip: !chromium }, async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch(browserOptions);
   try {
     let { page } = await open(browser, { width: 375, height: 700 }, 'U_TEST_STRANGER', null, cfg);
     await page.waitForFunction(() => /尚未加入照護家庭/.test(document.getElementById('loading').textContent));
@@ -79,9 +81,40 @@ test('狀態：未綁定使用者顯示錯誤訊息；空資料顯示「—」',
   } finally { await browser.close(); }
 });
 if (process.env.DEBUG_E2E) test('debug', { skip: !chromium }, async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch(browserOptions);
   const { page } = await open(browser, { width: 1280, height: 800 }, 'U_TEST_A1', null, cfg);
   await page.waitForTimeout(1500);
   console.log('LOADING:', await page.textContent('#loading'), '| gs:', await page.evaluate(() => typeof google), '| cfg:', await page.evaluate(() => JSON.stringify(window.HUB_CONFIG)), '| msg:', await page.textContent('#message'));
   await browser.close();
+});
+
+test('未綁定的每日紀錄入口顯示綁定表單，建立後回到每日紀錄', { skip: !chromium }, async () => {
+  const browser = await chromium.launch(browserOptions);
+  try {
+    const page = await browser.newPage({viewport:{width:375,height:700}});
+    const {render} = require('../frontend/server');
+    await page.route('https://static.line-scdn.net/**', route => route.fulfill({contentType:'application/javascript',
+      body:'window.liff={init:async()=>{},isLoggedIn:()=>true,getAccessToken:()=> "fixture-token"};'}));
+    const fake = `
+      window.fetch=async (url,opts)=>{
+        const body=JSON.parse(opts.body);
+        window.actions=(window.actions||[]).concat(body.action);
+        if(body.action==='memberStatus')return Response.json({ok:true,bound:false});
+        if(body.action==='createFamily')return Response.json({ok:true,bound:true,role:'admin'});
+        if(body.action==='read')return Response.json({ok:true,familyId:'F_TEST_A',role:'admin',metrics:[{metricKey:'blood_glucose',metricName:'血糖',inputType:'number',isActive:true}],settings:{blood_glucose:true}});
+        return Response.json({ok:false},{status:400});
+      };
+    `;
+    await page.setContent(render('daily',{LIFF_ENDPOINT:'https://hub.example.test/',LIFF_ID:'fixture'})
+      .replace('<head>','<head><script>'+fake+'</script>'));
+    await page.getByRole('heading',{name:'綁定照護家庭'}).waitFor();
+    assert.equal(await page.locator('#hubModule').isVisible(),false);
+    await page.getByRole('textbox',{name:'希望家人在畫面上看到的稱呼'}).fill('測試本人');
+    await page.getByRole('button',{name:'建立家庭'}).click();
+    await page.locator('#recordForm').waitFor();
+    assert.equal(await page.locator('#memberGate').isVisible(),false);
+    assert.deepEqual(await page.evaluate(() => window.actions),['memberStatus','createFamily','read']);
+  } finally {
+    await browser.close();
+  }
 });

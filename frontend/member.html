@@ -1,0 +1,83 @@
+<style>
+ #memberGate{max-width:520px;margin:0 auto;padding:16px 16px 40px;font:16px/1.55 system-ui,-apple-system,'Noto Sans TC',sans-serif;color:#25362e}
+ #memberGate form,#memberGate section:not([hidden]){padding:18px;margin:14px 0;background:#f1f7f3;border-radius:12px}
+ #memberGate label,#memberGate input{display:block;width:100%}
+ #memberGate input,#memberGate button,#memberGate a{font:inherit;margin:8px 0;padding:9px}
+ #memberGate input{box-sizing:border-box;border:1px solid #779083;border-radius:8px}
+ #memberGate button{color:white;background:#246044;border:0;border-radius:8px}
+ #memberGate output{overflow-wrap:anywhere;display:block}
+ #memberGate fieldset{border:0;margin:0;padding:0}
+ #memberGate legend{font-weight:700;margin-bottom:8px}
+ #memberGate .opt{display:flex;gap:8px;align-items:center}
+ #memberGate .opt input{width:auto;margin:0}
+ #memberGate button.danger{color:#a33a2f;background:white;border:1px solid #a33a2f}
+ #memberGate .group{margin:12px 0 0}
+ #memberGate button.secondary{color:#246044;background:white;border:1px solid #246044}
+ #memberGate #choose button{width:100%;margin:10px 0;padding:16px}
+ #hubModule[hidden],#memberGate [hidden],#memberGate[hidden]{display:none!important}
+</style>
+<main id="memberGate">
+ <h1 id="memberHeading">陪你久久</h1>
+ <p id="memberStatus" role="status">正在確認 LINE 與家庭身分…</p>
+ <div id="onboarding" hidden>
+  <div id="choose">
+   <button type="button" id="chooseStart">為自己建立照護家庭</button>
+   <button type="button" id="chooseJoin" class="secondary">加入家人的照護家庭</button>
+  </div>
+  <form id="startFamily" hidden>
+   <h2>為自己建立照護家庭</h2>
+   <fieldset id="startStep1">
+    <legend>步驟 1／2　基本資料</legend>
+    <label>希望家人在畫面上看到的稱呼<input name="patientName" required maxlength="60"></label>
+    <label>出生年（選填）<input name="birthYear" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="例如 1956"></label>
+    <p class="group">慢性病（選填，可複選）</p>
+    <label class="opt"><input type="checkbox" name="condition" value="高血壓">高血壓</label>
+    <label class="opt"><input type="checkbox" name="condition" value="糖尿病">糖尿病</label>
+    <label class="opt"><input type="checkbox" name="condition" value="心臟病">心臟病</label>
+    <label class="opt"><input type="checkbox" name="condition" value="腎臟病">腎臟病</label>
+    <label>其他慢性病<input name="conditionOther" maxlength="30"></label>
+    <label>過敏史（選填）<input name="allergies" maxlength="200"></label>
+    <button type="button" id="toStep2">下一步</button>
+   </fieldset>
+   <fieldset id="startStep2" hidden>
+    <legend>步驟 2／2　要追蹤的項目</legend>
+    <label class="opt"><input type="checkbox" name="metric" value="blood_pressure" checked>血壓（mmHg）</label>
+    <label class="opt"><input type="checkbox" name="metric" value="blood_glucose" checked>血糖（mg/dL）</label>
+    <details>
+     <summary>設定警示值（選填，稍後可在追蹤設定修改）</summary>
+     <label>收縮壓下限<input type="number" min="0" max="1000" name="t:blood_pressure:systolicLow"></label>
+     <label>收縮壓上限<input type="number" min="0" max="1000" name="t:blood_pressure:systolicHigh"></label>
+     <label>舒張壓下限<input type="number" min="0" max="1000" name="t:blood_pressure:diastolicLow"></label>
+     <label>舒張壓上限<input type="number" min="0" max="1000" name="t:blood_pressure:diastolicHigh"></label>
+     <label>血糖下限<input type="number" min="0" max="1000" name="t:blood_glucose:alertLow"></label>
+     <label>血糖上限<input type="number" min="0" max="1000" name="t:blood_glucose:alertHigh"></label>
+    </details>
+    <button type="button" id="backStep1" class="secondary">上一步</button>
+    <button>確認建立</button>
+   </fieldset>
+   <button type="button" class="secondary back">返回</button>
+  </form>
+  <form id="joinFamily" hidden>
+   <h2>加入家人的照護家庭</h2>
+   <fieldset id="joinStep1">
+    <label>家人提供的邀請碼<input name="inviteCode" required autocomplete="off" minlength="32" maxlength="32"></label>
+    <button>確認邀請碼</button>
+   </fieldset>
+   <fieldset id="joinStep2" hidden>
+    <p id="joinPreview"></p>
+    <button>確認加入</button>
+    <button type="button" id="backJoin" class="secondary">重新輸入</button>
+   </fieldset>
+   <button type="button" class="secondary back">返回</button>
+  </form>
+ </div>
+ <section id="familyPanel" hidden>
+  <h2 id="patientName"></h2>
+  <p id="familyRole"></p>
+  <div id="memberLinks"></div>
+  <button id="invite" hidden>產生家人邀請碼</button>
+  <output id="inviteCode"></output>
+  <button id="retryMenu" hidden>重試更新 LINE 選單</button>
+  <button id="unbind" class="danger">解除綁定</button>
+ </section>
+</main>

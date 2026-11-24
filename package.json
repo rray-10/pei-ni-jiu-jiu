@@ -4,6 +4,11 @@
   "version": "0.1.0",
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "sync:gas": "bash scripts/sync-gas.sh"
+    "sync:gas": "bash scripts/sync-gas.sh",
+    "start": "node frontend/server.js",
+    "start:local": "node --env-file=.env.staging frontend/server.js"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
