@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-Hant"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>陪你久久｜健康標準設定</title>
+  <script>window.F1A_CONFIG = <?!= JSON.stringify(app) ?>;</script>
+  <style>
+    :root{font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;color:#23312d;background:#f7f8f4;line-height:1.5}*{box-sizing:border-box}body{margin:0}.wrap{max-width:760px;margin:auto;padding:22px 16px 40px}.brand{color:#357664;font-weight:700}.card{background:#fff;border:1px solid #e5eae5;border-radius:16px;padding:18px;margin-top:14px}h1{font-size:24px;margin:4px 0}h2{font-size:18px;margin:0 0 12px}.hint{font-size:14px;color:#64716b;margin:5px 0}.row{border-top:1px solid #edf0ed;padding:14px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.control{width:100%;border:1px solid #d6dfd9;border-radius:10px;padding:10px;font:inherit}.enabled{display:flex;gap:9px;align-items:center;font-weight:650;margin-bottom:10px}.enabled input{width:20px;height:20px;accent-color:#357664}.btn{border:0;border-radius:11px;padding:13px 18px;background:#357664;color:#fff;font:inherit;font-weight:700}.btn:disabled{opacity:.55}.status{min-height:24px;margin:12px 0;color:#64716b}.error{color:#b42318}.hidden{display:none!important}@media(max-width:520px){.grid{grid-template-columns:1fr}}
+  </style>
+</head><body><main class="wrap">
+  <div class="brand">陪你久久</div><h1>健康標準設定</h1><p class="hint">只有照護家庭管理者可以儲存設定；一般成員僅能查看。</p>
+  <section id="panel" class="card hidden"><h2 id="family"></h2><div id="settings"></div><button id="save" class="btn hidden" type="button">儲存健康標準設定</button></section>
+  <p id="status" class="status" role="status" aria-live="polite">正在載入並確認管理者身分…</p>
+</main>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script><script>
+(() => {
+  const cfg=window.F1A_CONFIG||{},$=id=>document.getElementById(id);let accessToken='',metrics=[],settings={};
+  function say(text,error=false){$('status').textContent=text;$('status').className='status'+(error?' error':'');}
+  async function api(action,extra={}){
+    if(cfg.useGasRpc){
+      const data=await new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve)
+        .withFailureHandler(reject).f1UiRequest({action,accessToken,...extra}));
+      if(!data.ok)throw new Error(data.error);
+      return data;
+    }
+    const res=await fetch(cfg.apiUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,accessToken,...extra})});const data=await res.json();if(!res.ok||data.ok===false)throw new Error(data.error||`連線失敗（${res.status}）`);return data;}
+  function field(m){const row=document.createElement('div');row.className='row';const label=document.createElement('label');label.className='enabled';const check=document.createElement('input');check.type='checkbox';check.dataset.enabled=m.metricKey;check.checked=!!settings[m.metricKey];label.append(check,document.createTextNode(`${m.metricName}（${m.metricKey}）`));row.append(label);
+    if(m.metricKey.startsWith('custom_')){const grid=document.createElement('div');grid.className='grid';for(const [key,hint,val] of [['metricName','自訂項目名稱',m.metricName],['unit','單位',m.unit||'']]){const input=document.createElement('input');input.className='control';input.dataset.key=key;input.dataset.metric=m.metricKey;input.placeholder=hint;input.value=val||'';grid.append(input);}row.append(grid);}
+    if(m.inputType==='number'||m.inputType==='bloodPressure'){const keys=m.inputType==='bloodPressure'?['systolicLow','systolicHigh','diastolicLow','diastolicHigh','systolicChangeThreshold','diastolicChangeThreshold']:['alertLow','alertHigh','changeThreshold'];const grid=document.createElement('div');grid.className='grid';keys.forEach(key=>{const input=document.createElement('input');input.className='control';input.type='number';input.step='any';input.dataset.key=key;input.dataset.metric=m.metricKey;input.placeholder=key;input.value=m[key]??'';grid.append(input);});row.append(grid);}
+    return row;
+  }
+  async function start(){if(!cfg.liffId||cfg.liffId.startsWith("REPLACE")){say("請先設定 LIFF ID（LIFF_ID）。",true);return;}try{if(window.hubSession){if(!await window.hubSession)return;}else await liff.init({liffId:cfg.liffId});if(!liff.isLoggedIn()){liff.login();return;}accessToken=liff.getAccessToken();if(!accessToken)throw new Error('LINE 登入憑證未取得');const data=await api('read');metrics=data.metrics||[];settings=data.settings||{};$('panel').classList.remove('hidden');$('family').textContent=`照護家庭：${data.familyId}`;$('settings').replaceChildren(...metrics.map(field));if(data.role==='admin')$('save').classList.remove('hidden');else {document.querySelectorAll('#settings input').forEach(el=>el.disabled=true);say('目前是一般成員，只能查看設定。若需要修改，請使用管理者 LINE 帳號登入。');}if(data.role==='admin')say('管理者驗證完成，可編輯並儲存。');}catch(e){say(e.message||'載入失敗，請稍後重試。',true);}}
+  $('save').addEventListener('click',async()=>{const button=$('save');button.disabled=true;say('正在儲存…');try{const out=[...document.querySelectorAll('[data-enabled]')].map(c=>{const item={metricKey:c.dataset.enabled,enabled:c.checked};document.querySelectorAll(`[data-metric="${c.dataset.enabled}"][data-key]`).forEach(el=>item[el.dataset.key]=el.type==='number'?(el.value===''?'':Number(el.value)):el.value.trim());return item;});await api('update',{settings:out});say('已儲存。每日健康紀錄會在下次載入時套用新設定。');}catch(e){say(e.message,true);}finally{button.disabled=false;}});
+  start();
+})();
+</script></body></html>
