@@ -97,6 +97,7 @@ test('F1 GAS POST writes live headers, dedupes retries, and dashboard POST scope
     getRange:() => ({setValues:values => rows[name].push(...values)})
   })};
   const props = {F1_SPREADSHEET_ID:'fixture-sheet',LINE_LOGIN_CHANNEL_ID:'fixture-channel'};
+  let friendStatus = 200;
   const ok = body => ({getResponseCode:() => 200,getContentText:() => JSON.stringify(body)});
   const sandbox = {
     Date,PropertiesService:{getScriptProperties:() => ({getProperty:key => props[key] ?? null})},
@@ -105,6 +106,7 @@ test('F1 GAS POST writes live headers, dedupes retries, and dashboard POST scope
     ContentService:{MimeType:{JSON:'json'},createTextOutput:body => ({setMimeType:() => JSON.parse(body)})},
     LockService:{getScriptLock:() => ({waitLock(){},hasLock:() => true,releaseLock(){}})},
     UrlFetchApp:{fetch(url,options) {
+      if (url.includes('/v2/bot/profile/')) return {getResponseCode:() => friendStatus,getContentText:() => '{}'};
       if (url.includes('/v2/profile')) return ok({userId:'fixture-line-a'});
       if (url.includes('access_token=')) {
         const token = decodeURIComponent(url.split('access_token=')[1]);
@@ -128,6 +130,18 @@ test('F1 GAS POST writes live headers, dedupes retries, and dashboard POST scope
   assert.equal(post(f1Files,body).savedCount,2);
   assert.equal(post(f1Files,body,'rpc').savedCount,2);
   assert.equal(post(f1Files,{action:'createFamily'},'rpc').ok,false);
+  // optional friend gate
+  props.REQUIRE_OA_FRIEND = 'true';
+  props.LINE_OA_ACCESS_TOKEN = 'fixture-oa-token';
+  friendStatus = 404;
+  assert.match(post(f1Files,{action:'joinFamily',accessToken:'fixture-access',inviteCode:'0'.repeat(32)}).error,/加入官方帳號/);
+  friendStatus = 503;
+  assert.match(post(f1Files,{action:'createFamily',accessToken:'fixture-access',patientName:'x'}).error,/暫時無法確認/);
+  friendStatus = 200;
+  assert.equal(post(f1Files,{action:'memberStatus',accessToken:'fixture-access'}).bound,true);
+  assert.equal(post(f1Files,{action:'createFamily',accessToken:'fixture-access',patientName:'x'}).ok,true);
+  delete props.REQUIRE_OA_FRIEND;
+  delete props.LINE_OA_ACCESS_TOKEN;
   const badBp = post(f1Files,{...body,requestId:'00000000-0000-4000-8000-000000000009',values:{blood_pressure:'222/258'}});
   assert.equal(badBp.ok,false);
   assert.match(badBp.error,/血壓數值不合理/);

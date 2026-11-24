@@ -21,6 +21,21 @@ function f1Identity_(token, channelId) {
   return uid;
 }
 
+const F1_NEED_FRIEND = '請先加入官方帳號為好友，才能完成綁定';
+
+/** Optional gate (Script Property REQUIRE_OA_FRIEND=true): binding needs the user to have added the OA, otherwise we could never message them. */
+function f1RequireFriend_(uid, props) {
+  if (props.getProperty('REQUIRE_OA_FRIEND') !== 'true') return;
+  const token = props.getProperty('LINE_OA_ACCESS_TOKEN');
+  if (!token) f1Fail_('尚未設定官方帳號憑證，無法確認好友狀態');
+  const response = UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/' + encodeURIComponent(uid),
+    {headers:{Authorization:'Bearer ' + token},muteHttpExceptions:true});
+  const code = response.getResponseCode();
+  if (code === 200) return;
+  if (code === 404) f1Fail_(F1_NEED_FRIEND);
+  f1Fail_('暫時無法確認官方帳號好友狀態，請稍後再試');
+}
+
 function f1Table_(ss, name, required) {
   const sheet = ss.getSheetByName(name);
   if (!sheet) f1Fail_('找不到工作表 ' + name);
@@ -161,6 +176,7 @@ function f1Request_(body) {
     const props = PropertiesService.getScriptProperties();
     const uid = f1Identity_(body.accessToken,props.getProperty('LINE_LOGIN_CHANNEL_ID'));
     body = {...body,lineName:f1LastName_};
+    if (['createFamily','joinFamily','switchFamily'].includes(body.action)) f1RequireFriend_(uid,props);
     if (!['read','memberStatus','previewInvite','listMembers','syncMenu'].includes(body.action)) {
       lock = LockService.getScriptLock();
       lock.waitLock(10000);
