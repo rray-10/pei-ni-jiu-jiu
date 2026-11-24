@@ -11,6 +11,10 @@
  #memberGate .opt{display:flex;gap:8px;align-items:center}
  #memberGate .opt input{width:auto;margin:0}
  #memberGate button.danger{color:#a33a2f;background:white;border:1px solid #a33a2f}
+ #memberGate ul{list-style:none;margin:0;padding:0}
+ #memberGate li{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 0;border-top:1px solid #dce7df}
+ #memberGate li .who{flex:1 1 100%}
+ #memberGate li button{margin:0;padding:6px 12px}
  #memberGate .group{margin:12px 0 0}
  #memberGate button.secondary{color:#246044;background:white;border:1px solid #246044}
  #memberGate #choose button{width:100%;margin:10px 0;padding:16px}
@@ -22,13 +26,15 @@
  <div id="onboarding" hidden>
   <div id="choose">
    <button type="button" id="chooseStart">為自己建立照護家庭</button>
+   <button type="button" id="chooseProxy" class="secondary">替家人建立照護家庭</button>
    <button type="button" id="chooseJoin" class="secondary">加入家人的照護家庭</button>
   </div>
   <form id="startFamily" hidden>
-   <h2>為自己建立照護家庭</h2>
+   <h2 id="startTitle">為自己建立照護家庭</h2>
+   <p id="proxyNotice" hidden>請先取得患者本人同意。建立後你會是管理者；患者本人之後用你產生的邀請連結加入，再由你把他設為管理者。<label class="opt"><input type="checkbox" name="consent">我已取得患者同意</label></p>
    <fieldset id="startStep1">
     <legend>步驟 1／2　基本資料</legend>
-    <label>希望家人在畫面上看到的稱呼<input name="patientName" required maxlength="60"></label>
+    <label>照護對象的稱呼（家人在畫面上看到的名字）<input name="patientName" required maxlength="60"></label>
     <label>出生年（選填）<input name="birthYear" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="例如 1956"></label>
     <p class="group">慢性病（選填，可複選）</p>
     <label class="opt"><input type="checkbox" name="condition" value="高血壓">高血壓</label>
@@ -71,6 +77,13 @@
    <button type="button" class="secondary back">返回</button>
   </form>
  </div>
+ <section id="switchPanel" hidden>
+  <h2>切換照護家庭</h2>
+  <p id="switchText"></p>
+  <p id="switchBlock"></p>
+  <button type="button" id="doSwitch">解除目前綁定並加入</button>
+  <button type="button" id="cancelSwitch" class="secondary">取消</button>
+ </section>
  <section id="familyPanel" hidden>
   <h2 id="patientName"></h2>
   <p id="familyRole"></p>
@@ -82,6 +95,10 @@
    <button type="button" id="copyInvite" class="secondary">複製邀請連結</button>
    <a id="shareInvite" target="_blank" rel="noopener">用 LINE 傳給家人</a>
   </div>
+  <section id="membersBox" hidden>
+   <h3>家庭成員</h3>
+   <ul id="memberList"></ul>
+  </section>
   <button id="retryMenu" hidden>重試更新 LINE 選單</button>
   <button id="unbind" class="danger">解除綁定</button>
  </section>

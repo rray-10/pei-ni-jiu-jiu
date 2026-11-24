@@ -100,6 +100,9 @@ clasp pull                    # 把遠端內容拉回本機（先確認不會蓋
 - `Members(familyId, lineUid, role)`：有這列才算已綁定。`role` 為 `admin`（為自己建立）或 `member`（用邀請碼加入）。
 - `FamilyPatients(familyId, patientId)`：一戶一位被照護者。`DailyRecords.patientId`、`appointments.patient_id` 都用這個 `P_…`，不是 LINE ID 也不是 familyId。
 - `Families` 另有選填 `birthYear`、`conditions`、`allergies`（建立家庭時自動補欄位）。
+- `Members` 另有 `displayName`、`joinedAt`；`Families` 另有 `createdFor`（`self`／`proxy`）。欄位缺少時由程式自動補上。
+- 角色只有 `admin`（管理者）與 `member`（成員）。管理者可產生邀請、把成員設為管理者、移除成員。「替家人建立」的建立者是管理者，患者本人之後用邀請連結加入，再由管理者設為管理者。
+- 已綁定的帳號開別人的邀請連結時，可選「解除目前綁定並加入」（一個帳號目前只能綁一個家庭；管理者若還有其他非管理者成員需先處理）。
 - 解除綁定只刪 `Members` 那一列，家庭與紀錄保留；同一個 LINE 帳號再次「為自己建立」會回到同一個家庭。管理者在還有其他成員時不能解除綁定。
 
 ## Rich Menu
