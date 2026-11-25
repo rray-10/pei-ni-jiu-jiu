@@ -16,12 +16,6 @@
   const cfg=window.F1A_CONFIG||{},$=id=>document.getElementById(id);let accessToken='',metrics=[],settings={};
   function say(text,error=false){$('status').textContent=text;$('status').className='status'+(error?' error':'');}
   async function api(action,extra={}){
-    if(cfg.useGasRpc){
-      const data=await new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve)
-        .withFailureHandler(reject).f1UiRequest({action,accessToken,...extra}));
-      if(!data.ok)throw new Error(data.error);
-      return data;
-    }
     const res=await fetch(cfg.apiUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,accessToken,...extra})});const data=await res.json();if(!res.ok||data.ok===false)throw new Error(data.error||`連線失敗（${res.status}）`);return data;}
   function field(m){const row=document.createElement('div');row.className='row';const label=document.createElement('label');label.className='enabled';const check=document.createElement('input');check.type='checkbox';check.dataset.enabled=m.metricKey;check.checked=!!settings[m.metricKey];label.append(check,document.createTextNode(`${m.metricName}（${m.metricKey}）`));row.append(label);
     if(m.metricKey.startsWith('custom_')){const grid=document.createElement('div');grid.className='grid';for(const [key,hint,val] of [['metricName','自訂項目名稱',m.metricName],['unit','單位',m.unit||'']]){const input=document.createElement('input');input.className='control';input.dataset.key=key;input.dataset.metric=m.metricKey;input.placeholder=hint;input.value=val||'';grid.append(input);}row.append(grid);}

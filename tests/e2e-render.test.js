@@ -109,8 +109,10 @@ test('未綁定的每日紀錄入口顯示綁定表單，建立後回到每日�
       .replace('<head>','<head><script>'+fake+'</script>'));
     await page.getByRole('heading',{name:'綁定照護家庭'}).waitFor();
     assert.equal(await page.locator('#hubModule').isVisible(),false);
-    await page.getByRole('textbox',{name:'希望家人在畫面上看到的稱呼'}).fill('測試本人');
-    await page.getByRole('button',{name:'建立家庭'}).click();
+    await page.getByRole('button',{name:'建立照護家庭'}).click();
+    await page.locator('#startFamily [name=patientName]').fill('測試本人');
+    await page.getByRole('button',{name:'下一步'}).click();
+    await page.getByRole('button',{name:'確認建立'}).click();
     await page.locator('#recordForm').waitFor();
     assert.equal(await page.locator('#memberGate').isVisible(),false);
     assert.deepEqual(await page.evaluate(() => window.actions),['memberStatus','createFamily','read']);

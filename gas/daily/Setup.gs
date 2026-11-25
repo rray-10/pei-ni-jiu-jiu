@@ -34,41 +34,30 @@ function setupStagingSpreadsheet() {
   props.setProperty('F1_SPREADSHEET_ID', ss.getId());
   console.log('F1_SPREADSHEET_ID=' + ss.getId());
   console.log(ss.getUrl());
+  setupN8nTabs();
 }
 
 /**
- * Staging only: creates the separate appointments (回診) workbook and stores its ID in APPT_SPREADSHEET_ID.
- * patient_id must equal FamilyPatients.patientId (P_...), never a LINE user ID or a family ID.
- * Copy the printed ID into the Dashboard project's APPT_SPREADSHEET_ID property as well.
+ * Staging only: adds the tabs the n8n workflow needs to the care workbook (F1_SPREADSHEET_ID).
+ * Safe to re-run: existing tabs and their data are left untouched.
+ * Set the Dashboard property APPT_SPREADSHEET_ID to the same spreadsheet ID.
  */
-function setupStagingAppointments() {
-  const props = PropertiesService.getScriptProperties();
-  const existing = props.getProperty('APPT_SPREADSHEET_ID');
-  if (existing) throw new Error('APPT_SPREADSHEET_ID already set: ' + existing);
-  const ss = SpreadsheetApp.create('陪你久久 STAGING 回診測試表');
-  ss.setSpreadsheetTimeZone('Asia/Taipei');
+function setupN8nTabs() {
+  const id = PropertiesService.getScriptProperties().getProperty('F1_SPREADSHEET_ID');
+  if (!id) throw new Error('Missing script property F1_SPREADSHEET_ID');
+  const ss = SpreadsheetApp.openById(id);
   const tabs = {
-    appointments: ['appt_id', 'patient_id', 'date', 'session', 'hospital', 'department', 'status'],
-    // written by the n8n reminder workflow; one row per reminder sent to one LINE user
-    notification_log: ['appt_id', 'user_id', 'channel', 'offset_days', 'status', 'sent_at']
+    appointments: 'appt_id,patient_id,date,session,hospital,department,status',
+    notification_log: 'appt_id,user_id,channel,offset_days,status,sent_at',
+    med_logs: 'log_id,familyId,date,slot,status,by_lineUid,at'
   };
-  Object.keys(tabs).forEach((name, i) => {
-    const sheet = i === 0 ? ss.getSheets()[0].setName(name) : ss.insertSheet(name);
-    sheet.getRange(1, 1, 1, tabs[name].length).setValues([tabs[name]]);
+  Object.keys(tabs).forEach(name => {
+    if (ss.getSheetByName(name)) return console.log('exists: ' + name);
+    const sheet = ss.insertSheet(name);
+    const headers = tabs[name].split(',');
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.setFrozenRows(1);
+    console.log('created: ' + name);
   });
-  props.setProperty('APPT_SPREADSHEET_ID', ss.getId());
-  console.log('APPT_SPREADSHEET_ID=' + ss.getId());
-  console.log(ss.getUrl());
-}
-
-function prepareAppointmentLog_(ss) {
-  if (ss.getName() !== '陪你久久 STAGING 回診測試表' || !ss.getSheetByName('appointments')) {
-    throw new Error('Expected the staging appointments workbook');
-  }
-  if (ss.getSheetByName('notification_log')) return;
-  const log = ss.insertSheet('notification_log');
-  const headers = ['appt_id','user_id','channel','offset_days','status','sent_at'];
-  log.getRange(1,1,1,headers.length).setValues([headers]);
-  log.setFrozenRows(1);
+  console.log('Dashboard APPT_SPREADSHEET_ID=' + id);
 }

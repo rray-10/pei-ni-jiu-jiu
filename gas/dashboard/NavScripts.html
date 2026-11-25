@@ -5,6 +5,6 @@
   m.addEventListener('click',function(){set(!b.classList.contains('nav-open'));});
   s.addEventListener('click',function(){set(false);});
   document.addEventListener('keydown',function(e){if(e.key==='Escape')set(false);});
-  document.getElementById('navSummary').addEventListener('click',function(e){e.preventDefault();set(false);window.hubShowSummary(true);});
+  document.getElementById('navSummary').addEventListener('click',function(e){set(false);if(window.hubShowSummary){e.preventDefault();window.hubShowSummary(true);}});
 })();
 </script>

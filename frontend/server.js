@@ -23,10 +23,9 @@ function render(page, env) {
   const titled = markup => markup.replace(/<title>[^<]*<\/title>/,'').replace('</head>','<title>陪你久久｜' + titles[page] + '</title></head>');
   const member = readFileSync(path.join(__dirname,'member.html'),'utf8');
   const controller = readFileSync(path.join(__dirname,'member.js'),'utf8');
-  const hubNav = page === 'dashboard' || page === 'summary';
+  const hasMenu = ['dashboard','summary','daily'].includes(page);
   const shell = '<style>html{background:#f7faf6}body{margin:0;background:#f7faf6;font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;color:#25362e}' +
-    (hubNav ? '.content>header .brand{display:none}.content>header{display:flex;align-items:center;min-height:52px;padding:4px 8px}'
-            : '.sidebar,.menu-btn,.scrim,.content>header,.daily-nav,.wrap>.brand{display:none!important}.content{margin-left:0!important}') +
+    (hasMenu ? '' : '.sidebar,.menu-btn,.scrim,.daily-nav,.wrap>.brand{display:none!important}.content{margin-left:0!important}') +
     '</style>';
   const gate = '<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>' + shell + member +
     '<script>window.MEMBER_CONFIG=' + scriptJSON({liffId:env.LIFF_ID,page,module:!portal,links:{
@@ -47,23 +46,30 @@ function render(page, env) {
       daily: base + '?page=daily',
       settings: base + '?page=settings',
       member: base + '?page=member',
+      summary: base + '?page=summary',
       medication: https(env.NAV_MEDICATION_URL),
-      appointments: base + '?page=appointments'
+      appointments: '' // 尚未完成（需 n8n），選單顯示為不可點
     }
   };
+  const fillNav = markup => markup
+    .replace(/<\?= config\.nav\.(\w+) \|\| '([^']*)' \?>/g, (_, key, fallback) => escape(config.nav[key] || fallback))
+    .replace(/<\?= config\.nav\.(\w+) \? '' : 'disabled' \?>/g, (_, key) => config.nav[key] ? '' : 'disabled');
+  // 每日紀錄沿用健康摘要的同一份漢堡選單
+  const withMenu = markup => markup
+    .replace('<!--hub-menu-->', '<button type="button" class="menu-btn" id="menuBtn" aria-expanded="false" aria-label="開啟選單" aria-controls="sidebar">☰</button>')
+    .replace('</head>', () => '<style>:root{--green:#38775c;--light:#eaf4ed;--ink:#25362e;--muted:#697b72;--line:#dce7df}@media(min-width:801px){body{padding-left:220px}}</style>' + read('dashboard','NavStyles') + '</head>')
+    .replace('</body>', () => fillNav(read('dashboard','NavMenu')).replace(' aria-current="page"','').replace('id="navDaily"','id="navDaily" aria-current="page"') + read('dashboard','NavScripts') + '</body>');
   if (page === 'daily' || page === 'settings') {
     const daily = read('daily', page === 'daily' ? 'Index' : 'Settings')
       .replace('<?!= JSON.stringify(app) ?>', () => scriptJSON({
         liffId: config.liffId, apiUrl: '/api/daily', dashboardUrl:base, lineChatUrl: https(env.LINE_CHAT_URL)
       }));
-    return gated(daily);
+    return gated(page === 'daily' ? withMenu(daily) : daily);
   }
-  return gated(read('dashboard', 'Index')
+  return gated(fillNav(read('dashboard', 'Index')
     .replace(/<\?!= include\('([A-Za-z]+)'\) \?>/g, (_, name) => read('dashboard', name))
     .replace(/<\?!= JSON.stringify\(config\).*?\?>/, () => scriptJSON(config))
-    .replace(/<\? if \(config.liffId\) \{ \?>(.*?)<\? \} \?>/, '$1')
-    .replace(/<\?= config\.nav\.(\w+) \|\| '([^']*)' \?>/g, (_, key, fallback) => escape(config.nav[key] || fallback))
-    .replace(/<\?= config\.nav\.(\w+) \? '' : 'disabled' \?>/g, (_, key) => config.nav[key] ? '' : 'disabled'));
+    .replace(/<\? if \(config.liffId\) \{ \?>(.*?)<\? \} \?>/, '$1')));
 }
 
 async function readBody(req) {
@@ -130,9 +136,6 @@ function createServer(env = process.env, fetcher = fetch) {
       const headers = {'Content-Type':'application/json'};
       if (url.pathname !== '/line/events' && req.headers.origin !== new URL(endpoint).origin) return json(403, {ok:false});
       const body = await readBody(req);
-      if (url.pathname === '/api/daily' && env.F1_WEBHOOK_GATEWAY_KEY) {
-        headers['X-Hub-Gateway-Key'] = env.F1_WEBHOOK_GATEWAY_KEY;
-      }
       if (url.pathname === '/line/events') {
         if (!validSignature(body, req.headers['x-line-signature'], env.LINE_MESSAGING_CHANNEL_SECRET)) return json(401, {ok:false});
         if (!env.LINE_WEBHOOK_GATEWAY_KEY) return json(503, {ok:false});

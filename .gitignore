@@ -9,7 +9,7 @@ credentials*.json
 n8n-credentials*
 .clasprc.json
 .clasp.json
-# n8n exports must be scrubbed before commit (see docs/security.md)
+# n8n exports must be scrubbed before commit (see README: 安全)
 n8n/**/*.credentials.json
 # real data exports
 *.xlsx
@@ -20,8 +20,8 @@ node_modules/
 coverage/
 .DS_Store
 
-# Local handoff files can contain live identifiers and data
-/file/陪你久久_Menu抽換的功能_PoC-說明文件.pdf
+# Local handoff files can contain live identifiers and tokens
+/file/
 
 # n8n import copies with real IDs filled in
 n8n/import/

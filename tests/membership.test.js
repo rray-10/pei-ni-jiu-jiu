@@ -3,7 +3,6 @@ const assert = require('node:assert/strict');
 const {createHash} = require('node:crypto');
 const {readFileSync} = require('node:fs');
 const vm = require('node:vm');
-const {planPatientLinks} = require('../scripts/plan-patient-links');
 const {render} = require('../frontend/server');
 
 test('member, daily, dashboard and appointment routes share a binding gate', () => {
@@ -137,21 +136,6 @@ test('self-binding provisions an idempotent family and patient and permits a sin
   assert.throws(() => run('fixture-proxy','createFamily',{patientName:'代建',proxy:true}),/同意/);
   assert.equal(run('fixture-proxy','createFamily',{patientName:'代建',proxy:true,consent:true}).role,'admin');
   assert.equal(tables.Families[0].includes('createdFor'),true);
-});
-
-test('legacy migration uses exact identity and rejects a shared patient ID without writing', () => {
-  const data = {
-    families:[{familyId:'F_TEST_A'},{familyId:'F_TEST_B'}],
-    members:[{familyId:'F_TEST_A',lineUid:'line-a'},{familyId:'F_TEST_B',lineUid:'line-b'}],
-    users:[{user_id:'u-a',line_user_id:'line-a',role:'patient'},{user_id:'u-b',line_user_id:'line-b',role:'family'}],
-    patients:[{user_id:'u-a',patient_id:'P_TEST_A'}],
-    family_links:[]
-  };
-  assert.deepEqual(planPatientLinks(data).ready,[{familyId:'F_TEST_A',patientId:'P_TEST_A'}]);
-  data.family_links.push({family_user_id:'u-b',patient_id:'P_TEST_A',status:'active'});
-  const conflict = planPatientLinks(data);
-  assert.equal(conflict.ready.length,0);
-  assert.equal(conflict.unresolved.every(row => row.reason === 'patient_shared_by_families'),true);
 });
 
 test('rich menu areas fit inside the design images and do not overlap', () => {

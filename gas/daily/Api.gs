@@ -157,13 +157,6 @@ function doPost(e) {
   return ContentService.createTextOutput(JSON.stringify(f1Request_(body))).setMimeType(ContentService.MimeType.JSON);
 }
 
-function f1UiRequest(body) {
-  if (!body || !['read','record','update'].includes(body.action)) {
-    return {ok:false,error:'操作無效'};
-  }
-  return f1Request_(body);
-}
-
 function f1Request_(body) {
   let lock;
   let out;

@@ -7,13 +7,12 @@
   <title>陪你久久｜健康紀錄</title>
   <script>window.F1A_CONFIG = <?!= JSON.stringify(app) ?>;</script>
   <style>
-    :root{font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;color:#23312d;background:#f7f8f4;font-size:16px;line-height:1.5}*{box-sizing:border-box}body{margin:0}.wrap{max-width:520px;margin:auto;padding:22px 16px 40px}.brand{color:#357664;font-size:14px;font-weight:700;letter-spacing:.08em}.card{background:#fff;border:1px solid #e5eae5;border-radius:18px;padding:18px;margin-top:14px;box-shadow:0 5px 20px #24352c0a}h1{font-size:25px;margin:4px 0}h2{font-size:18px;margin:0 0 12px}.hint{font-size:14px;color:#64716b;margin:4px 0 0}.field{padding:13px 0;border-bottom:1px solid #edf0ed}.field:last-child{border:0;padding-bottom:2px}label{display:block;font-weight:650;margin-bottom:7px}.unit{font-size:13px;color:#75817b;font-weight:400;margin-left:5px}.pair,.periods{display:grid;grid-template-columns:1fr 1fr;gap:10px}.control{width:100%;border:1px solid #d6dfd9;border-radius:11px;padding:12px;font:inherit;background:#fff;color:inherit}.check{display:flex;align-items:center;gap:10px}.check input{width:20px;height:20px;accent-color:#357664}.actions{display:grid;gap:10px;margin-top:15px}.btn{border:0;border-radius:12px;padding:13px 15px;font:inherit;font-weight:700;background:#357664;color:white}.btn:disabled{opacity:.55}.status{font-size:14px;min-height:22px;margin:12px 2px}.status.error{color:#b42318}.status.ok{color:#26724e}.hidden{display:none!important}.topline{display:flex;justify-content:space-between;align-items:center;gap:10px}.badge{font-size:12px;color:#52645b;background:#eef3ef;padding:4px 8px;border-radius:99px}.alert{font-size:13px;margin:9px 0 0;padding:9px 11px;border-radius:10px;background:#f1f4f1;color:#52645b}.alert.warn{background:#fff1ec;color:#9a3412}.period-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:12px 0}.period-tab{padding:10px 4px;border:1px solid #dce5de;border-radius:10px;background:#fff;color:#365b4e;font:inherit;font-size:14px;font-weight:650}.period-tab[aria-pressed=true]{background:#357664;border-color:#357664;color:#fff}textarea{min-height:78px;resize:vertical}
+    :root{font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;color:#23312d;background:#f7f8f4;font-size:16px;line-height:1.5}*{box-sizing:border-box}body{margin:0}.wrap{max-width:520px;margin:auto;padding:22px 16px 40px}.card{background:#fff;border:1px solid #e5eae5;border-radius:18px;padding:18px;margin-top:14px;box-shadow:0 5px 20px #24352c0a}h1{font-size:25px;margin:4px 0}h2{font-size:18px;margin:0 0 12px}.hint{font-size:14px;color:#64716b;margin:4px 0 0}.field{padding:13px 0;border-bottom:1px solid #edf0ed}.field:last-child{border:0;padding-bottom:2px}label{display:block;font-weight:650;margin-bottom:7px}.unit{font-size:13px;color:#75817b;font-weight:400;margin-left:5px}.pair,.periods{display:grid;grid-template-columns:1fr 1fr;gap:10px}.control{width:100%;border:1px solid #d6dfd9;border-radius:11px;padding:12px;font:inherit;background:#fff;color:inherit}.check{display:flex;align-items:center;gap:10px}.check input{width:20px;height:20px;accent-color:#357664}.actions{display:grid;gap:10px;margin-top:15px}.btn{border:0;border-radius:12px;padding:13px 15px;font:inherit;font-weight:700;background:#357664;color:white}.btn:disabled{opacity:.55}.status{font-size:14px;min-height:22px;margin:12px 2px}.status.error{color:#b42318}.status.ok{color:#26724e}.hidden{display:none!important}.topline{display:flex;justify-content:space-between;align-items:center;gap:10px}.title{display:flex;align-items:center;gap:12px;min-width:0}.toast{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.35)}.toast[hidden]{display:none}.toast div{min-width:230px;padding:24px 28px;border-radius:18px;background:#fff;text-align:center;box-shadow:0 12px 32px rgba(0,0,0,.2)}.toast span{display:flex;align-items:center;justify-content:center;width:56px;height:56px;margin:0 auto 10px;border-radius:50%;background:#357664;color:#fff;font-size:30px}.toast strong{display:block;font-size:20px}.toast small{display:block;margin-top:4px;font-size:14px;color:#64716b}.badge{flex:none;white-space:nowrap;font-size:12px;color:#52645b;background:#eef3ef;padding:4px 8px;border-radius:99px}.alert{font-size:13px;margin:9px 0 0;padding:9px 11px;border-radius:10px;background:#f1f4f1;color:#52645b}.alert.warn{background:#fff1ec;color:#9a3412}.period-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:12px 0}.period-tab{padding:10px 4px;border:1px solid #dce5de;border-radius:10px;background:#fff;color:#365b4e;font:inherit;font-size:14px;font-weight:650}.period-tab[aria-pressed=true]{background:#357664;border-color:#357664;color:#fff}textarea{min-height:78px;resize:vertical}
   </style>
 </head>
 <body>
 <main class="wrap">
-  <div class="brand">陪你久久</div>
-  <div class="topline"><div><h1>健康紀錄</h1><p class="hint">依家庭設定顯示要記錄的項目。</p></div><span id="member" class="badge">連線中</span></div>
+  <div class="topline"><div class="title"><!--hub-menu--><div><h1>健康紀錄</h1><p class="hint">依家庭設定顯示要記錄的項目。</p></div></div><span id="member" class="badge">連線中</span></div>
 
   <form class="card hidden" id="recordForm">
     <h2>每日紀錄</h2>
@@ -27,6 +26,7 @@
   <section class="card hidden" id="returnCard" role="status" aria-live="polite"><h2 id="returnTitle">紀錄已儲存</h2><div id="warningList"></div><p class="hint" id="returnMessage">正在返回 LINE 官方帳號…</p><div class="actions"><a id="showDashboard" href="?page=dashboard" hidden>查看健康摘要</a><button class="btn" id="returnToLine" type="button">返回 LINE 官方帳號</button></div></section>
   <p id="status" class="status" role="status" aria-live="polite"></p>
 </main>
+<div id="toast" class="toast" role="alert" hidden><div><span aria-hidden="true">✓</span><strong>儲存成功</strong><small id="toastHint"></small></div></div>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
 (() => {
@@ -47,12 +47,6 @@
   function buildPeriodTabs(){const root=$("periodTabs");root.replaceChildren(...medPeriods.map(([key,label])=>{const b=document.createElement("button");b.type="button";b.className="period-tab";b.textContent=label;b.dataset.period=key;b.setAttribute("aria-pressed","false");b.addEventListener("click",()=>selectPeriod(key));return b;}));$("recordDate").value=taipeiDate();$("recordDate").addEventListener("change",()=>{clearPeriodDrafts();selectPeriod(suggestedPeriod());});selectPeriod(suggestedPeriod());}
   const status = (message, type="") => { $("status").textContent = message; $("status").className = `status ${type}`; };
   async function api(action, extra={}) {
-    if (cfg.useGasRpc) {
-      const result = await new Promise((resolve, reject) => google.script.run.withSuccessHandler(resolve)
-        .withFailureHandler(reject).f1UiRequest({action,accessToken:token,...extra}));
-      if (!result.ok) throw new Error(result.error);
-      return result;
-    }
     const response = await fetch(cfg.apiUrl, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,accessToken:token,...extra})});
     let data; try { data = await response.json(); } catch { throw new Error("伺服器回覆格式錯誤"); }
     if (!response.ok || data.ok === false) throw new Error(data.error || `連線失敗（${response.status}）`);
@@ -80,7 +74,7 @@
   }
   function render(data) {
     metrics = data.metrics || [];periodDrafts={};
-    $("member").textContent = `${data.familyId} · ${data.role === "admin" ? "管理者" : "成員"}`;
+    $("member").textContent = data.role === "admin" ? "管理者" : "成員";
     const settings=data.settings || {}; enabledKeys = new Set(Object.keys(settings).filter(k=>settings[k]));
     const formMetrics=metrics.filter(m=>m.isActive && enabledKeys.has(m.metricKey));
     const fields=$("recordFields");fields.replaceChildren(...formMetrics.map(createField));
@@ -106,13 +100,17 @@
       const signature=JSON.stringify(submission);
       if(pendingSubmission?.signature!==signature)pendingSubmission={signature,requestId:crypto.randomUUID()};
       const result=await api("record",{...submission,requestId:pendingSubmission.requestId});pendingSubmission=null;e.target.reset();$("recordDate").value=taipeiDate();showSavedAndReturn(result.warnings||[]);
-    } catch(err){status(err.message,"error");} finally {button.disabled=false;}
+    } catch(err){status(err.message,"error");$("status").scrollIntoView({block:"nearest"});} finally {button.disabled=false;}
   });
   function showSavedAndReturn(warnings=[]){
     $("recordForm").classList.add("hidden");$("returnCard").classList.remove("hidden");$("status").textContent="";
     const list=$("warningList");list.replaceChildren();
-    if(warnings.length){$("returnTitle").textContent="紀錄已儲存，請留意數值變化";warnings.forEach(w=>{const p=document.createElement("p");p.className="alert warn";const change=Number(w.delta);p.textContent=`${w.metricName||w.label||w.metricKey}：前日 ${w.previous}${w.unit||""} → 今日 ${w.current}${w.unit||""}（${change>0?"增加":"減少"} ${Math.abs(change)}${w.unit||""}，達到提醒門檻 ${w.threshold}${w.unit||""}）。此提醒僅供參考，請依醫療人員建議判讀。`;list.append(p);});$("returnMessage").textContent="提醒已顯示，5 秒後返回 LINE；也可以立即返回。";window.setTimeout(()=>returnToLine(true),5000);}
-    else {$("returnTitle").textContent="紀錄已儲存";$("returnMessage").textContent="正在返回 LINE 官方帳號…";returnToLine(true);}
+    if(warnings.length){$("returnTitle").textContent="紀錄已儲存，請留意數值變化";warnings.forEach(w=>{const p=document.createElement("p");p.className="alert warn";const change=Number(w.delta);p.textContent=`${w.metricName||w.label||w.metricKey}：前日 ${w.previous}${w.unit||""} → 今日 ${w.current}${w.unit||""}（${change>0?"增加":"減少"} ${Math.abs(change)}${w.unit||""}，達到提醒門檻 ${w.threshold}${w.unit||""}）。此提醒僅供參考，請依醫療人員建議判讀。`;list.append(p);});$("returnMessage").textContent="提醒已顯示，5 秒後返回 LINE；也可以立即返回。";showToast("請留意下方提醒",1800);window.setTimeout(()=>returnToLine(true),5000);}
+    else {$("returnTitle").textContent="紀錄已儲存";$("returnMessage").textContent="即將返回 LINE 官方帳號…";showToast("即將返回 LINE…",2000,()=>returnToLine(true));}
+  }
+  function showToast(hint,duration,done){
+    $("toastHint").textContent=hint;$("toast").hidden=false;
+    window.setTimeout(()=>{$("toast").hidden=true;done?.();},duration);
   }
   function returnToLine(automatic=false){
     const fallback=()=>{
@@ -134,7 +132,7 @@
   $("returnToLine").addEventListener("click",()=>returnToLine(false));
   async function start(){
     if(!cfg.liffId||cfg.liffId.startsWith("REPLACE")){status("請先設定 LIFF ID（LIFF_ID）。","error");return;}
-    if(!cfg.useGasRpc&&(!cfg.apiUrl||cfg.apiUrl.includes("YOUR_N8N_HOST"))){status("每日紀錄 API 未設定。","error");return;}
+    if(!cfg.apiUrl){status("每日紀錄 API 未設定。","error");return;}
     try {if(window.hubSession){if(!await window.hubSession)return;}else await liff.init({liffId:cfg.liffId});if(!liff.isLoggedIn()){liff.login();return;}}
     catch(e){status("LIFF 初始化失敗，請稍後重試。","error");return;}
     try {token=liff.getAccessToken();if(!token)throw new Error("尚未取得登入憑證");const data=await api("read");render(data);status("健康設定已載入，可開始填寫今日紀錄。","ok");}

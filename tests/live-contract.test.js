@@ -5,8 +5,8 @@ const { readFileSync } = require('node:fs');
 const vm = require('node:vm');
 const { Readable } = require('node:stream');
 const { createServer, render } = require('../frontend/server');
-const main = require('../n8n/line-main/integration-test.json');
-const f3 = require('../n8n/appointment/integration-test.json');
+const workflow = require('../n8n/main-flow.json');
+const flowNode = name => workflow.nodes.find(node => node.name === name);
 
 const env = {LIFF_ENDPOINT:'https://hub.example.test/', LIFF_ID:'fixture-app'};
 
@@ -44,39 +44,62 @@ test('gateway validates exact signed bytes and forwards unchanged LINE event', a
   }
   assert.equal(await request(raw+' '),401);
   assert.equal(await request(raw),200);
-  const parse = main.nodes.find(n => n.name === 'Code in JavaScript').parameters.jsCode;
+  const parse = flowNode('Code in JavaScript').parameters.jsCode;
   const items = new Function('$input',parse)({first:() => ({json:{body:{events:[postback]}}})});
   assert.deepEqual(items[0].json.event, postback);
-  assert.equal(items[0].json.keyword,'回診管理');
-  assert.equal(main.connections.Switch.main[2][0].node,'傳遞完整 LINE Event');
+  assert.equal(items[0].json.postbackData, postback.postback.data);
 });
 
-test('F3 child uses trusted family crosswalk and preserves postback datetimepicker params', () => {
-  const event = {type:'postback',postback:{data:'action=appt_date&id=new',params:{date:'2026-11-26'}},
-    source:{userId:'fixture-line'},replyToken:'fixture-reply',webhookEventId:'fixture-event'};
-  const fixtures = {
-    '讀取 Members':[{lineUid:'fixture-line',familyId:'fixture-family'}],
-    '讀取 appointments':[],
-    '讀取 FamilyPatients':[{familyId:'fixture-family',patientId:'fixture-patient'}],
-    '解析事件':[{event}]
+// Minimal Luxon stand-in: "today" is 2026-12-03 and every parsed date is 2026-12-04.
+const day = iso => ({isValid:true,weekday:5,hour:10,toISODate:() => iso,toFormat:format => format === 'HH:mm' ? '10:00' : '12/4',
+  setZone() { return this; },startOf() { return this; },diff:() => ({days:1})});
+const clock = {fromISO:value => day(value || '2026-12-04'),now:() => day('2026-12-03')};
+function runNode(name,tables) {
+  return new Function('$','DateTime',flowNode(name).parameters.jsCode)(table => ({
+    first:() => ({json:(tables[table] || [])[0]}),
+    all:() => (tables[table] || []).map(json => ({json}))
+  }),clock).map(item => item.json);
+}
+
+test('appointment flow writes a draft only for a bound family and keeps postback datetime params', () => {
+  const event = {type:'postback',postback:{data:'action=appt_datetime&id=new',params:{datetime:'2026-12-04T13:00'}},
+    source:{userId:'fixture-line'},replyToken:'fixture-reply'};
+  const tables = {'Get row(s) in sheet':[{lineUid:'fixture-line',familyId:'fixture-family'}],'查詢回診進行中':[],'解析事件':[{event}]};
+  const [write, reply] = runNode('決定動作',tables);
+  assert.equal(write.row.patient_id,'fixture-family');
+  assert.deepEqual([write.row.date,write.row.session,write.row.status],['2026-12-04','13:00','draft']);
+  assert.equal(reply.replyToken,'fixture-reply');
+  tables['Get row(s) in sheet'] = [];
+  assert.equal(runNode('決定動作',tables).some(item => item.kind === 'write'),false);
+});
+
+test('appointment reminder reaches only that family and skips a push already sent', () => {
+  const tables = {
+    '提醒設定':[{MODE:'morning'}],
+    '提醒｜讀取 appointments':[{appt_id:'fake-appointment',patient_id:'F_TEST',date:'2026-12-04',status:'scheduled'}],
+    '提醒｜讀取 users':[{familyId:'F_TEST',lineUid:'line-family'},{familyId:'F_OTHER',lineUid:'line-other'}],
+    '提醒｜讀取 patients':[{familyId:'F_TEST',patientName:'虛構家人'}],
+    '提醒｜讀取 notification_log':[]
   };
-  const code = f3.nodes.find(n => n.name === '決定動作').parameters.jsCode;
-  const DateTime = {now:() => ({setZone:() => ({toISODate:() => '2026-11-23'})}),
-    fromISO:date => ({isValid:true,toISODate:() => date,toFormat:() => "11/26",weekday:4})};
-  function run(familyId) {
-    return new Function('$','DateTime', code)(name => ({
-      first:() => ({json:{familyId}}),
-      all:() => fixtures[name].map(json => ({json}))
-    }),DateTime).map(item => item.json);
+  const pushes = runNode('組合推播',tables);
+  assert.deepEqual(pushes.map(item => item.to),['line-family']);
+  tables['提醒｜讀取 notification_log'].push({...pushes[0].log,status:'sent'});
+  assert.deepEqual(runNode('組合推播',tables),[]);
+});
+
+test('committed workflow is inactive, de-identified, matches the rich menu texts and cannot replace the menu', () => {
+  const text = JSON.stringify(workflow);
+  assert.equal(workflow.active,false);
+  assert.doesNotMatch(text,/"credentials"|docs\.google\.com|\bU[0-9a-f]{32}\b/);
+  for (const node of workflow.nodes.filter(item => item.type.endsWith('.googleSheets'))) {
+    assert.match(node.parameters.documentId.value,/^(REPLACE_STAGING_SPREADSHEET_ID|=\{\{.*SHEET_ID \}\})$/);
   }
-  const created = run('fixture-family');
-  assert.equal(created[0].row.date,'2026-11-26');
-  assert.equal(created[0].row.patient_id,'fixture-patient');
-  assert.equal(created[0].row.appt_id,'APT-fixture-event');
-  assert.equal(created[1].messages[0].contents.footer.contents[0].action.type,'datetimepicker');
-  assert.equal(run('other-family').some(i => i.kind === 'write'),false);
-  fixtures['讀取 appointments'].push(created[0].row);
-  assert.deepEqual(run('fixture-family'),[]);
+  for (const node of workflow.nodes.filter(item => /^(手動：更新圖文選單|選單｜)/.test(item.name))) assert.equal(node.disabled,true,node.name);
+  const keywords = flowNode('Switch').parameters.rules.values.flatMap(rule => rule.conditions.conditions.map(item => item.rightValue));
+  const context = vm.createContext({});
+  vm.runInContext(readFileSync('gas/daily/RichMenu.gs','utf8'),context);
+  const messages = context.richMenuDefinitions_('fixture').bound.areas.map(area => area.action).filter(action => action.type === 'message');
+  for (const action of messages) assert.ok(keywords.includes(action.text),action.text);
 });
 
 test('F1 GAS POST writes live headers, dedupes retries, and dashboard POST scopes reads to verified family', () => {
@@ -116,10 +139,9 @@ test('F1 GAS POST writes live headers, dedupes retries, and dashboard POST scope
       return ok({aud:'fixture-channel',sub:'fixture-line-' + options.payload.id_token.split('.').pop()});
     }}
   };
-  const post = (files,body,transport = 'http') => {
+  const post = (files,body) => {
     const context = vm.createContext({...sandbox});
     for (const file of files) vm.runInContext(readFileSync(file,'utf8'),context);
-    if (transport === 'rpc') return context.f1UiRequest(body);
     return context.doPost({postData:{contents:JSON.stringify(body)}});
   };
   const f1Files = ['gas/daily/Api.gs','gas/daily/Membership.gs'];
@@ -128,8 +150,7 @@ test('F1 GAS POST writes live headers, dedupes retries, and dashboard POST scope
   const body = {action:'record',accessToken:'fixture-access',familyId:'fixture-b',requestId:'00000000-0000-4000-8000-000000000001',
     recordDate:date,period:'morning',values:{blood_pressure:'132/84',blood_glucose:6.1}};
   assert.equal(post(f1Files,body).savedCount,2);
-  assert.equal(post(f1Files,body,'rpc').savedCount,2);
-  assert.equal(post(f1Files,{action:'createFamily'},'rpc').ok,false);
+  assert.equal(post(f1Files,body).savedCount,2); // retry with the same requestId
   // optional friend gate
   props.REQUIRE_OA_FRIEND = 'true';
   props.LINE_OA_ACCESS_TOKEN = 'fixture-oa-token';
@@ -157,33 +178,6 @@ test('F1 GAS POST writes live headers, dedupes retries, and dashboard POST scope
   assert.match(post(dashFiles,{action:'getDashboardData',idToken:'x.x.b',patientId:'P_TEST_A',days:7}).error,/FORBIDDEN/);
 });
 
-test('F3 reminder selects only the authorized family and skips a previously sent push', () => {
-  const workflow = require('../n8n/appointment/reminders-test.json');
-  const code = workflow.nodes.find(node => node.name === '組合推播').parameters.jsCode;
-  const tables = {
-    '提醒設定':[{MODE:'morning'}],
-    '提醒｜讀取 appointments':[{appt_id:'fake-appointment',patient_id:'P_TEST',date:'2026-12-04',status:'scheduled'}],
-    '提醒｜讀取 Members':[{familyId:'F_TEST',lineUid:'line-family'},{familyId:'F_OTHER',lineUid:'line-other'}],
-    '提醒｜讀取 Families':[{familyId:'F_TEST',patientName:'虛構家人'}],
-    '提醒｜讀取 FamilyPatients':[{familyId:'F_TEST',patientId:'P_TEST'}],
-    '提醒｜讀取 notification_log':[]
-  };
-  const date = {isValid:true,weekday:5,toISODate:() => '2026-12-04',toFormat:() => '12/4',
-    startOf:() => ({diff:() => ({days:1})})};
-  const clock = {fromISO:() => date,now:() => ({setZone:() => date})};
-  const run = () => new Function('$','DateTime',code)(name => ({
-    first:() => ({json:tables[name][0]}),
-    all:() => tables[name].map(json => ({json}))
-  }),clock);
-  assert.deepEqual(run().map(item => item.json.to),['line-family']);
-  tables['提醒｜讀取 notification_log'].push({...run()[0].json.log,status:'sent'});
-  assert.deepEqual(run(),[]);
-  tables['提醒｜讀取 notification_log'].pop();
-  tables['提醒｜讀取 FamilyPatients'].push({familyId:'F_OTHER',patientId:'P_TEST'});
-  assert.deepEqual(run(),[]);
-  assert.equal(workflow.active,false);
-});
-
 test('generated PDF is handed off through a short-lived download URL instead of base64', async () => {
   const pdf = Buffer.from('%PDF-1.4 fixture');
   const server = createServer({...env,DASHBOARD_GAS_URL:'https://script.google.com/macros/s/fixture/exec'}, async () => new Response(JSON.stringify({ok:true,data:{filename:'摘要.pdf',base64:pdf.toString('base64')}})));
@@ -203,4 +197,20 @@ test('generated PDF is handed off through a short-lived download URL instead of 
     assert.equal(Buffer.from(await download.arrayBuffer()).equals(pdf),true);
     assert.equal((await fetch(base + '/pdf/' + '0'.repeat(32))).status,404);
   } finally { server.close(); }
+});
+
+test('setupN8nTabs adds only the missing tabs with the headers the workflow reads', () => {
+  const created = {};
+  const spreadsheet = {
+    getSheetByName:name => name === 'appointments' || created[name] ? {} : null,
+    insertSheet:name => ({getRange:() => ({setValues:([headers]) => { created[name] = headers; }}),setFrozenRows(){}})
+  };
+  const context = vm.createContext({console:{log(){}},SpreadsheetApp:{openById:() => spreadsheet},
+    PropertiesService:{getScriptProperties:() => ({getProperty:() => 'fixture-sheet'})}});
+  vm.runInContext(readFileSync('gas/daily/Setup.gs','utf8'),context);
+  context.setupN8nTabs();
+  context.setupN8nTabs();
+  assert.deepEqual(Object.keys(created),['notification_log','med_logs']);
+  const documented = readFileSync('n8n/README.md','utf8');
+  for (const headers of Object.values(created)) assert.ok(documented.includes(headers.join(',')));
 });

@@ -7,7 +7,7 @@ test('gas/dashboard 與 adapters 同步', () => {
   }
 });
 test('repo 不含疑似密鑰或真實 LINE UID', () => {
-  const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.name === 'node_modules' || e.name === '.git' || (d === '.' && e.name === 'file') || /^\.env(?!\.example$)/.test(e.name) ? [] : e.isDirectory() ? walk(d + '/' + e.name) : [d + '/' + e.name]);
+  const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.name === 'node_modules' || e.name === '.git' || (d === '.' && e.name === 'file') || (d === './n8n' && e.name === 'import') || /^\.env(?!\.example$)/.test(e.name) ? [] : e.isDirectory() ? walk(d + '/' + e.name) : [d + '/' + e.name]);
   for (const f of walk('.')) {
     if (f.endsWith('gas-sync.test.js')) continue;
     const t = fs.readFileSync(f, 'utf8');

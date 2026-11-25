@@ -1,7 +1,5 @@
 /**
  * 陪你久久｜健康儀表板（整合版）— 讀取 F1 DailyRecords + 回診資料。
- * 對照原 DEMO 版：file/health_gas_mvp 2/Code.gs（已移除寫死的 demo 使用者）。
- *
  * 部署注意：Web App「執行身分=我、存取=任何人」是 LIFF 使用者進入所必需；
  * 因此【存取控制完全由本檔的 LINE ID Token 驗證 + Members 查詢負責】，不可繞過。
  * 本版只讀（spreadsheets.readonly），不會修改任何正式 Sheet。
