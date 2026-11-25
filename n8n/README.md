@@ -36,13 +36,16 @@ node scripts/prepare-n8n-import.js STAGING_SPREADSHEET_ID=<試算表 ID> ADMIN_L
 
 LINE webhook 建議走 Render：OA webhook 填 `https://<主機>/line/events`（驗 LINE 簽章），Render 的 `LINE_MAIN_WEBHOOK_URL` 填本流程的 webhook 網址。
 
+## 回診資料
+
+本流程的 `appointments.patient_id` 存 `familyId`（`F_…`），儀表板已配合讀取。Dashboard 的 `APPT_SPREADSHEET_ID` 要填同一份試算表。
+
 ## 已知問題（尚未處理）
 
-1. **儀表板讀不到這裡建立的回診。** 本流程的 `appointments.patient_id` 存 `familyId`（`F_…`），儀表板用 `FamilyPatients.patientId`（`P_…`）比對。
-2. **用藥打卡不會出現在儀表板。** 本流程寫 `med_logs`，儀表板讀 `DailyRecords`。
-3. **Webhook 沒有驗證。** 知道網址的人可以偽造事件。可在 Webhook 節點加 Header Auth（`X-Hub-Gateway-Key`，值同 Render 的 `LINE_WEBHOOK_GATEWAY_KEY`），LINE 一律經 Render 轉送。
-4. 沒有過濾 `source.type`，群組內的指令也會回覆（可能在群組顯示回診資料）。
-5. 多處用 `.first()`，LINE 一次送來多個事件時，只有部分流程能正確處理。
-6. `每日記錄`、`健康摘要`、`會員中心` 只回覆「收到…」佔位文字（Rich Menu 的這三顆按鈕直接開 LIFF，手動打字才會遇到）。
-7. 未綁定選單的「介紹陪你久久」會得到「尚未找到你的照護家庭資料」。
-8. 回診當晚提醒提到「更多 → 記醫囑」，目前沒有這個選單。
+1. **用藥打卡不會出現在儀表板。** 本流程寫 `med_logs`，儀表板讀 `DailyRecords`。
+2. **Webhook 沒有驗證。** 知道網址的人可以偽造事件。可在 Webhook 節點加 Header Auth（`X-Hub-Gateway-Key`，值同 Render 的 `LINE_WEBHOOK_GATEWAY_KEY`），LINE 一律經 Render 轉送。
+3. 沒有過濾 `source.type`，群組內的指令也會回覆（可能在群組顯示回診資料）。
+4. 多處用 `.first()`，LINE 一次送來多個事件時，只有部分流程能正確處理。
+5. `每日記錄`、`健康摘要`、`會員中心` 只回覆「收到…」佔位文字（Rich Menu 的這三顆按鈕直接開 LIFF，手動打字才會遇到）。
+6. 未綁定選單的「介紹陪你久久」會得到「尚未找到你的照護家庭資料」。
+7. 回診當晚提醒提到「更多 → 記醫囑」，目前沒有這個選單。

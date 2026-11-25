@@ -77,7 +77,8 @@ var DashboardService = (function () {
     var total = meds.reduce(function (s, r) { return s + r.total; }, 0);
 
     var appts = (src.appointments || []).map(A.normalizeAppointment)
-      .filter(function (a) { return a.patientId === pid; });
+      // n8n 主流程把 familyId 寫進 patient_id，其他來源用 patientId；兩者都只取登入者自己的家庭
+      .filter(function (a) { return a.patientId === pid || a.patientId === ctx.familyId; });
     var up = A.upcomingAppointments(appts, nowIso);
     var next = up[0] ? { scheduled_at: up[0].date + 'T00:00:00+08:00', date: up[0].date, session: up[0].session, department: up[0].department, hospital: up[0].hospital } : null;
 

@@ -97,7 +97,7 @@ clasp pull                    # 把遠端內容拉回本機（先確認不會蓋
 `Families`、`Members`、`FamilyPatients`、`FamilyInvites`、`MetricDefinitions`、`TrackingSettings`、`DailyRecords`；n8n 另用同一份的 `appointments`、`notification_log`、`med_logs`。重點：
 
 - `Members(familyId, lineUid, role)`：有這列才算已綁定。`role` 為 `admin`（為自己建立）或 `member`（用邀請碼加入）。
-- `FamilyPatients(familyId, patientId)`：一戶一位被照護者。`DailyRecords.patientId` 與儀表板比對回診都用這個 `P_…`，不是 LINE ID 也不是 familyId（n8n 目前寫的是 familyId，尚未一致）。
+- `FamilyPatients(familyId, patientId)`：一戶一位被照護者。`DailyRecords.patientId` 用這個 `P_…`，不是 LINE ID 也不是 familyId。`appointments.patient_id` 例外：n8n 寫的是 `familyId`，儀表板兩種都認（僅限登入者自己的家庭）。
 - `Families` 另有選填 `birthYear`、`conditions`、`allergies`（建立家庭時自動補欄位）。
 - `Members` 另有 `displayName`、`joinedAt`；`Families` 另有 `createdFor`（`self`／`proxy`）。欄位缺少時由程式自動補上。
 - 角色只有 `admin`（管理者）與 `member`（成員）。管理者可產生邀請、把成員設為管理者、移除成員。「替家人建立」的建立者是管理者，患者本人之後用邀請連結加入，再由管理者設為管理者。

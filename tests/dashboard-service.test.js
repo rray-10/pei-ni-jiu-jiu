@@ -74,6 +74,16 @@ test('#7 新增回診後顯示正確日期；#8 取消／過期不再顯示', ()
   d = S.getDashboardData(s, 'U_TEST_A1', null, 7, NOW);
   assert.equal(d.nextAppointment, null);              // A2 已取消、A3 已過期 → 無
 });
+test('回診 patient_id 是 familyId（n8n 寫法）也讀得到，但只限自己的家庭', () => {
+  const s = src();
+  const mine = S.getSessionContext(s, 'U_TEST_A1').familyId;
+  const other = s.families.find(f => f.familyId !== mine).familyId;
+  const row = { appt_id: 'N1', date: '2026-11-24', session: '09:00', hospital: '台大', department: '家醫科', status: 'scheduled' };
+  s.appointments = [{ ...row, patient_id: other }];
+  assert.equal(S.getDashboardData(s, 'U_TEST_A1', null, 7, NOW).nextAppointment, null);
+  s.appointments.push({ ...row, appt_id: 'N2', patient_id: mine, department: '心臟內科' });
+  assert.equal(S.getDashboardData(s, 'U_TEST_A1', null, 7, NOW).nextAppointment.department, '心臟內科');
+});
 test('用藥回報率：TRUE/FALSE 與 JSON 混合', () => {
   const d = dash('U_TEST_A1', 7);
   // TRUE(1/1) + FALSE(0/1) ；JSON 該筆為 11-21 → 7 天窗口內(11-17..11-23)：3/4
