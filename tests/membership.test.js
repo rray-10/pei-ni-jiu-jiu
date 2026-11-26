@@ -26,6 +26,7 @@ test('membership lifecycle: create, invite, leave, admin choices, delete and res
     FamilyPatients:[['familyId','patientId']],
     FamilyInvites:[['codeHash','familyId','expiresAt','claimedBy']],
     TrackingSettings:[['familyId','metricKey','enabled','updatedAt']],
+    PendingLinks:[['lineUid','familyId','role','createdAt','expiresAt']],
     MetricDefinitions:[['metricKey','metricName','inputType','unit','isActive'],['blood_pressure','血壓','bloodPressure','mmHg',true],['blood_glucose','血糖','number','mg/dL',true]]
   };
   const ss = {getSheetByName(name) {
@@ -123,6 +124,21 @@ test('membership lifecycle: create, invite, leave, admin choices, delete and res
   assert.notEqual(fresh.familyId,first.familyId);
   assert.equal(fresh.patientName,'全新稱呼');
   assert.equal(run('fixture-caregiver','createFamily',{patientName:'重送',requestId}).familyId,fresh.familyId); // already bound: no second family
+
+  // a non-friend accepting an invite is parked as pending; the follow event completes the binding
+  const pendingCode = run('fixture-caregiver','createInvite').inviteCode;
+  assert.equal(context.membership_(ss,'fixture-newfriend',{action:'joinFamily',inviteCode:pendingCode,notFriend:true}).pending,true);
+  assert.equal(run('fixture-newfriend','memberStatus').bound,false);
+  assert.equal(tables.PendingLinks.length,2);
+  const activated = context.memberActivatePending_(ss,'fixture-newfriend');
+  assert.equal(activated.activated,true);
+  assert.equal(run('fixture-newfriend','memberStatus').bound,true);
+  assert.equal(context.memberActivatePending_(ss,'fixture-newfriend').reason,'none'); // a second follow does nothing
+  // an expired pending row is never activated
+  context.membership_(ss,'fixture-late2',{action:'joinFamily',inviteCode:run('fixture-caregiver','createInvite').inviteCode,notFriend:true});
+  tables.PendingLinks.find(item => item[0] === 'fixture-late2')[4] = new Date(Date.now() - 1000).toISOString();
+  assert.equal(context.memberActivatePending_(ss,'fixture-late2').reason,'none');
+  assert.equal(run('fixture-late2','memberStatus').bound,false);
 
   // profile, thresholds and proxy consent still validated
   const profiled = run('fixture-profile','createFamily',{patientName:'含資料',birthYear:'1956',conditions:['高血壓','糖尿病'],

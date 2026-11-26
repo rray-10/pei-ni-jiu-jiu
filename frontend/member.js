@@ -295,6 +295,11 @@ window.hubSession = (async () => {
         disable(true);
         try {
           const result = await api(action,fields);
+          if (result.pending) {
+            status('請加入官方帳號好友，加入後會自動完成綁定。');
+            $('addFriend').hidden = false;
+            return;
+          }
           if (cfg.module && result.menu === 'retry') {
             showFamily(result);
             status('家庭已綁定。可重試更新 LINE 選單，或繼續使用原本功能。');

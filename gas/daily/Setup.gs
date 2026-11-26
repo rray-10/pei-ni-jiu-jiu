@@ -49,7 +49,8 @@ function setupN8nTabs() {
   const tabs = {
     appointments: 'appt_id,patient_id,date,session,hospital,department,status',
     notification_log: 'appt_id,user_id,channel,offset_days,status,sent_at',
-    med_logs: 'log_id,familyId,date,slot,status,by_lineUid,at'
+    med_logs: 'log_id,familyId,date,slot,status,by_lineUid,at',
+    PendingLinks: 'lineUid,familyId,role,createdAt,expiresAt'
   };
   Object.keys(tabs).forEach(name => {
     if (ss.getSheetByName(name)) return console.log('exists: ' + name);

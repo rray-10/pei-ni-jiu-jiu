@@ -33,6 +33,7 @@ node scripts/prepare-n8n-import.js STAGING_SPREADSHEET_ID=<試算表 ID> ADMIN_L
 | `appointments` | `appt_id,patient_id,date,session,hospital,department,status` |
 | `notification_log` | `appt_id,user_id,channel,offset_days,status,sent_at` |
 | `med_logs` | `log_id,familyId,date,slot,status,by_lineUid,at` |
+| `PendingLinks` | `lineUid,familyId,role,createdAt,expiresAt`（非好友邀請後等待加好友） |
 
 LINE webhook 建議走 Render：OA webhook 填 `https://<主機>/line/events`（驗 LINE 簽章），Render 的 `LINE_MAIN_WEBHOOK_URL` 填本流程的 webhook 網址。
 

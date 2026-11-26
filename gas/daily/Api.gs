@@ -23,6 +23,41 @@ function f1Identity_(token, channelId) {
 
 const F1_NEED_FRIEND = '請先加入官方帳號為好友，才能完成綁定';
 
+/** 回傳是否為官方帳號好友；無法確認時丟錯（不是 404 就不能當作非好友）。 */
+function f1IsFriend_(uid, props) {
+  const token = props.getProperty('LINE_OA_ACCESS_TOKEN');
+  if (!token) f1Fail_('尚未設定官方帳號憑證，無法確認好友狀態');
+  const code = UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/' + encodeURIComponent(uid),
+    {headers:{Authorization:'Bearer ' + token},muteHttpExceptions:true}).getResponseCode();
+  if (code === 200) return true;
+  if (code === 404) return false;
+  f1Fail_('暫時無法確認官方帳號好友狀態，請稍後再試');
+}
+
+/** n8n 收到 follow 事件時呼叫：以 lineUid 啟用待確認的綁定。需要 ACTIVATE_GATEWAY_KEY 才會執行。 */
+function f1Activate_(body) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const key = props.getProperty('ACTIVATE_GATEWAY_KEY');
+    if (!key || f1Text_(body.gatewayKey) !== key) return {ok:false,error:'未授權'};
+    const uid = f1Text_(body.lineUid);
+    if (!/^U[0-9a-f]{32}$/.test(uid)) return {ok:false,error:'userId 無效'};
+    const ss = SpreadsheetApp.openById(props.getProperty('F1_SPREADSHEET_ID'));
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    let out;
+    try {
+      out = memberActivatePending_(ss,uid);
+    } finally {
+      lock.releaseLock();
+    }
+    if (out.activated) out.menu = syncMemberMenu_(uid,props);
+    return {ok:true,...out};
+  } catch (err) {
+    return {ok:false,error:'服務暫時無法完成'};
+  }
+}
+
 /** Optional gate (Script Property REQUIRE_OA_FRIEND=true): binding needs the user to have added the OA, otherwise we could never message them. */
 function f1RequireFriend_(uid, props) {
   if (props.getProperty('REQUIRE_OA_FRIEND') !== 'true') return;
@@ -195,6 +230,9 @@ function doPost(e) {
   } catch (_) {
     body = {};
   }
+  if (body.action === 'activatePending') {
+    return ContentService.createTextOutput(JSON.stringify(f1Activate_(body))).setMimeType(ContentService.MimeType.JSON);
+  }
   return ContentService.createTextOutput(JSON.stringify(f1Request_(body))).setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -211,7 +249,9 @@ function f1Request_(body) {
     const props = PropertiesService.getScriptProperties();
     const uid = f1Identity_(body.accessToken,props.getProperty('LINE_LOGIN_CHANNEL_ID'));
     body = {...body,lineName:f1LastName_};
-    if (['createFamily','joinFamily','switchFamily'].includes(body.action)) f1RequireFriend_(uid,props);
+    if (['createFamily','switchFamily'].includes(body.action)) f1RequireFriend_(uid,props);
+    // 邀請加入時非好友不擋：先記成待確認，加好友的 follow 事件到了才正式綁定
+    if (body.action === 'joinFamily' && props.getProperty('REQUIRE_OA_FRIEND') === 'true') body = {...body,notFriend:!f1IsFriend_(uid,props)};
     if (!['read','memberStatus','previewInvite','listMembers','syncMenu'].includes(body.action)) {
       lock = LockService.getScriptLock();
       lock.waitLock(10000);

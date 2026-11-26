@@ -156,7 +156,7 @@ test('F1 GAS POST writes live headers, dedupes retries, and dashboard POST scope
   props.REQUIRE_OA_FRIEND = 'true';
   props.LINE_OA_ACCESS_TOKEN = 'fixture-oa-token';
   friendStatus = 404;
-  assert.match(post(f1Files,{action:'joinFamily',accessToken:'fixture-access',inviteCode:'0'.repeat(32)}).error,/加入官方帳號/);
+  assert.match(post(f1Files,{action:'createFamily',accessToken:'fixture-access',patientName:'x'}).error,/加入官方帳號/);
   friendStatus = 503;
   assert.match(post(f1Files,{action:'createFamily',accessToken:'fixture-access',patientName:'x'}).error,/暫時無法確認/);
   friendStatus = 200;
@@ -211,7 +211,7 @@ test('setupN8nTabs adds only the missing tabs with the headers the workflow read
   vm.runInContext(readFileSync('gas/daily/Setup.gs','utf8'),context);
   context.setupN8nTabs();
   context.setupN8nTabs();
-  assert.deepEqual(Object.keys(created),['notification_log','med_logs']);
+  assert.deepEqual(Object.keys(created),['notification_log','med_logs','PendingLinks']);
   const documented = readFileSync('n8n/README.md','utf8');
   for (const headers of Object.values(created)) assert.ok(documented.includes(headers.join(',')));
 });

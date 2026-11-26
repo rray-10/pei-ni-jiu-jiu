@@ -1,5 +1,6 @@
 const MEMBER_ACTIONS = ['memberStatus','previewInvite','createFamily','joinFamily','switchFamily','createInvite','syncMenu','unbind','deleteFamily','restoreFamily','listMembers','removeMember','promoteMember'];
 const MEMBER_RESTORE_MONTHS = 3;
+const PENDING_HOURS = 24;
 const MEMBER_DEFAULT_METRICS = ['blood_pressure','blood_glucose'];
 const memberHash_ = value => Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,value,Utilities.Charset.UTF_8)
   .map(byte => ((byte + 256) % 256).toString(16).padStart(2,'0')).join('');
@@ -57,6 +58,55 @@ function memberInvite_(ss, code) {
   const invites = f1Table_(ss,'FamilyInvites',['codeHash','familyId','expiresAt','claimedBy']);
   const index = invites.rows.findIndex(row => row.codeHash === memberHash_(code));
   return {invites,index,invite:invites.rows[index]};
+}
+
+/** 過期或已綁定的待確認列刪掉，避免表越來越長。 */
+function memberPrunePending_(table) {
+  const now = Date.now();
+  for (let i = table.rows.length - 1; i >= 0; i--) {
+    if (!(Date.parse(table.rows[i].expiresAt) > now)) {
+      table.sheet.deleteRow(i+2);
+      table.rows.splice(i,1);
+    }
+  }
+}
+
+/** 非好友點邀請：先記成待確認，加好友的 follow 事件到了才正式綁定。 */
+function memberAddPending_(ss, uid, familyId) {
+  const pending = f1Table_(ss,'PendingLinks',['lineUid','familyId','role','createdAt','expiresAt']);
+  memberPrunePending_(pending);
+  const old = pending.rows.findIndex(row => row.lineUid === uid);
+  if (old >= 0) {
+    pending.sheet.deleteRow(old+2);
+    pending.rows.splice(old,1);
+  }
+  const now = Date.now();
+  f1Append_(pending,[{lineUid:uid,familyId,role:'member',createdAt:new Date(now).toISOString(),expiresAt:new Date(now + PENDING_HOURS*3600000).toISOString()}]);
+}
+
+/**
+ * follow 事件：把待確認的人正式綁定。回傳 {activated, reason}，reason = none（沒有或已過期）、bound（已綁定）、family_gone（家庭已刪除）。
+ * 只有在家庭仍有效時才寫入 Members；待確認列在結果確定後才刪除。
+ */
+function memberActivatePending_(ss, uid) {
+  const pending = f1Table_(ss,'PendingLinks',['lineUid','familyId','role','createdAt','expiresAt']);
+  memberPrunePending_(pending);
+  const index = pending.rows.findIndex(row => row.lineUid === uid);
+  if (index < 0) return {activated:false,reason:'none'};
+  const row = pending.rows[index];
+  const members = f1Table_(ss,'Members',['familyId','lineUid','role']);
+  const finish = (activated, reason) => {
+    pending.sheet.deleteRow(index+2);
+    pending.rows.splice(index,1);
+    SpreadsheetApp.flush();
+    return {activated,reason};
+  };
+  if (members.rows.some(member => member.lineUid === uid)) return finish(false,'bound');
+  const families = f1Table_(ss,'Families',['familyId','patientName']).rows.find(item => item.familyId === row.familyId);
+  if (!families || f1Text_(families.deletedAt)) return finish(false,'family_gone');
+  const family = memberFamily_(ss,row.familyId);
+  memberAppendMember_(members,row.familyId,uid,row.role === 'admin' ? 'admin' : 'member',{});
+  return finish(true,'') && {activated:true,reason:'',patientName:family.patientName,familyId:row.familyId};
 }
 
 /** 3 個月內可復原（刪除後由建立頁復原，只恢復刪除的人，其他人用新邀請重新加入）。 */
@@ -287,6 +337,10 @@ function membership_(ss, uid, body) {
     memberFamily_(ss,familyId);
     invites.sheet.getRange(index+2,invites.headers.indexOf('claimedBy')+1).setValue(uid);
     SpreadsheetApp.flush();
+    if (body.notFriend === true) {
+      memberAddPending_(ss,uid,familyId);
+      return {bound:false,pending:true,patientName:memberFamily_(ss,familyId).patientName};
+    }
     memberAppendMember_(members,familyId,uid,'member',body);
     matches = [{familyId,lineUid:uid,role:'member'}];
   }
