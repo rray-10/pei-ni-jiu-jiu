@@ -223,6 +223,12 @@ function f1Settings_(table, input, ctx, catalog, uid, now) {
   f1Append_(table,rows);
 }
 
+/** 瀏覽器直接開 /exec 時的回應。頁面在 Render，這裡只回報服務狀態。 */
+function doGet(e) {
+  return ContentService.createTextOutput(JSON.stringify({ok:true,service:'daily',note:'API 僅接受 POST'}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
 function doPost(e) {
   let body;
   try {
