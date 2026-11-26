@@ -47,7 +47,7 @@
   function buildPeriodTabs(){const root=$("periodTabs");root.replaceChildren(...medPeriods.map(([key,label])=>{const b=document.createElement("button");b.type="button";b.className="period-tab";b.textContent=label;b.dataset.period=key;b.setAttribute("aria-pressed","false");b.addEventListener("click",()=>selectPeriod(key));return b;}));$("recordDate").value=taipeiDate();$("recordDate").addEventListener("change",()=>{clearPeriodDrafts();selectPeriod(suggestedPeriod());});selectPeriod(suggestedPeriod());}
   const status = (message, type="") => { $("status").textContent = message; $("status").className = `status ${type}`; };
   async function api(action, extra={}) {
-    const response = await fetch(cfg.apiUrl, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,accessToken:token,...extra})});
+    const response = await (window.hubPrefetch?.(action) || fetch(cfg.apiUrl, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,accessToken:token,...extra})}));
     let data; try { data = await response.json(); } catch { throw new Error("伺服器回覆格式錯誤"); }
     if (!response.ok || data.ok === false) throw new Error(data.error || `連線失敗（${response.status}）`);
     return data;

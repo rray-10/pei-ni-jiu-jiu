@@ -115,8 +115,43 @@ test('未綁定的每日紀錄入口顯示綁定表單，建立後回到每日�
     await page.getByRole('button',{name:'確認建立'}).click();
     await page.locator('#recordForm').waitFor();
     assert.equal(await page.locator('#memberGate').isVisible(),false);
-    assert.deepEqual(await page.evaluate(() => window.actions),['memberStatus','createFamily','read']);
+    // the prefetched read made before binding is discarded and fetched again afterwards
+    assert.deepEqual(await page.evaluate(() => window.actions),['read','memberStatus','createFamily','read']);
   } finally {
     await browser.close();
   }
+});
+
+test('已綁定時，頁面資料與會員狀態同時請求，且只請求一次', { skip: !chromium }, async () => {
+  const browser = await chromium.launch(browserOptions);
+  try {
+    const {render} = require('../frontend/server');
+    const hub = (() => {
+      const S = (0, eval)(bundle + ';DashboardService'), c = S.getSessionContext(src(), 'U_TEST_A1');
+      return {context:c, dashboard:S.getDashboardData(src(), 'U_TEST_A1', c.patients[0].id, 7, NOW), meta:{devMode:false, timings:{}}};
+    })();
+    const replies = {
+      daily:['read',{ok:true,familyId:'F_TEST_A',role:'admin',metrics:[{metricKey:'blood_glucose',metricName:'血糖',inputType:'number',isActive:true}],settings:{blood_glucose:true}},'#recordForm'],
+      settings:['read',{ok:true,familyId:'F_TEST_A',role:'admin',metrics:[],settings:{}},'#panel'],
+      dashboard:['getHubData',{ok:true,data:hub},'#app']
+    };
+    for (const [name, [action, reply, ready]] of Object.entries(replies)) {
+      const page = await browser.newPage({viewport:{width:375,height:700}});
+      await page.route('https://static.line-scdn.net/**', route => route.fulfill({contentType:'application/javascript',
+        body:'window.liff={init:async()=>{},isLoggedIn:()=>true,isInClient:()=>false,getAccessToken:()=>"fixture-token"};'}));
+      // memberStatus is held back until the page data request has been sent
+      const fake = `window.actions=[];window.fetch=async (url,opts)=>{
+        const body=JSON.parse(opts.body);window.actions.push(body.action);
+        if(body.action==='memberStatus'){await new Promise(r=>window.release=r);return Response.json({ok:true,bound:true,role:'admin'});}
+        return Response.json(${JSON.stringify(reply)});};`;
+      await page.setContent(render(name,{LIFF_ENDPOINT:'https://hub.example.test/',LIFF_ID:'fixture'})
+        .replace('<head>', () => '<head><script>' + fake.replace(/<\/script/g,'<\\/script') + '</script>'));
+      await page.waitForFunction(() => window.release);
+      assert.deepEqual(await page.evaluate(() => window.actions), [action,'memberStatus'], name);
+      await page.evaluate(() => window.release());
+      await page.locator(ready).waitFor();
+      assert.deepEqual(await page.evaluate(() => window.actions), [action,'memberStatus'], name + ' must not request twice');
+      await page.close();
+    }
+  } finally { await browser.close(); }
 });

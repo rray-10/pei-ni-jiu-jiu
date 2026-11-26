@@ -111,6 +111,22 @@ window.hubSession = (async () => {
         $('membersBox').hidden = false;
       } catch (err) { status(err.message,'error'); }
     }
+    // 已綁定是常態：功能頁需要的資料和會員狀態同時發出，不必排隊。未綁定時結果直接丟棄。
+    let early = null;
+    window.hubPrefetch = action => {
+      if (!early || early.action !== action) return null;
+      const {response} = early;
+      early = null;
+      return response;
+    };
+    if (cfg.module) {
+      const [url, body] = ['daily','settings'].includes(cfg.page)
+        ? ['/api/daily',{action:'read',accessToken}]
+        : ['/api/dashboard',{action:'getHubData',idToken:accessToken,days:7}];
+      const response = fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      response.catch(() => {}); // 由取用的頁面處理錯誤
+      early = {action:body.action,response};
+    }
     const data = await api('memberStatus');
     $('invite').onclick = async () => {
       $('invite').disabled = true;
@@ -172,6 +188,7 @@ window.hubSession = (async () => {
       } catch (err) { status(err.message,'error'); }
     }
     if (data.bound) return finish(data);
+    early = null; // 綁定前抓的資料已無效，完成綁定後頁面會重新讀取
     $('onboarding').hidden = false;
     $('memberHeading').textContent = '綁定照護家庭';
     checkFriend();
