@@ -23,9 +23,29 @@ async function familyView(db, familyId) {
   return {patientName: fam ? fam.patient_name : '', patientId: link ? link.patient_id : ''};
 }
 
-async function memberStatus({db, uid}) {
+const RESTORE_MONTHS = 3;
+
+// 刪除時間 + 3 個月；月底回到該月最後一天（與 GAS 相同規則）
+function restoreUntil(deletedAt) {
+  const until = new Date(deletedAt);
+  if (isNaN(until)) return null;
+  const day = until.getUTCDate();
+  until.setUTCMonth(until.getUTCMonth() + RESTORE_MONTHS);
+  if (until.getUTCDate() !== day) until.setUTCDate(0);
+  return until;
+}
+
+async function restorableFor(db, uid, nowMs) {
+  const rows = await db.select('families', {select: 'family_id,patient_name,deleted_at,deleted_by', deleted_by: 'eq.' + uid});
+  return rows.filter(r => r.deleted_at).map(r => ({familyId: r.family_id, patientName: r.patient_name,
+    restoreUntil: restoreUntil(r.deleted_at), deletedAt: r.deleted_at}))
+    .filter(r => r.restoreUntil && r.restoreUntil.getTime() > nowMs)
+    .map(({deletedAt, ...rest}) => ({...rest, restoreUntil: rest.restoreUntil.toISOString()}));
+}
+
+async function memberStatus({db, uid, nowMs = Date.now()}) {
   const me = await currentMembership(db, uid);
-  if (!me) return {ok: true, bound: false};
+  if (!me) return {ok: true, bound: false, restorable: await restorableFor(db, uid, nowMs)};
   return {ok: true, bound: true, familyId: me.family_id, role: me.role, ...(await familyView(db, me.family_id))};
 }
 
@@ -62,10 +82,11 @@ function parseThresholds(body, metrics) {
   });
 }
 
-async function createFamily({db, uid, body, nowMs = Date.now()}) {
+async function createFamily({db, uid, body, nowMs = Date.now(), oa = null, requireFriend = false}) {
   const existing = await currentMembership(db, uid);
   if (existing) return {ok: true, ...(await memberStatus({db, uid}))};   // 同一帳號重送：回傳目前狀態
   const profile = parseProfile(body);
+  if (requireFriend && oa && !(await oa.isFriend(uid))) throw fail('FORBIDDEN', '請先加入官方帳號為好友，才能完成綁定');
   const request = /^[0-9a-f-]{36}$/i.test(text(body.requestId)) ? text(body.requestId) : randomBytes(16).toString('hex');
   const key = sha256(uid + ':' + request);
   const familyId = 'F_' + key.slice(0, 32);
@@ -117,12 +138,18 @@ async function previewInvite({db, uid, body, nowMs = Date.now()}) {
   return {ok: true, preview: await familyView(db, invite.family_id)};
 }
 
-async function joinFamily({db, uid, body, nowMs = Date.now()}) {
+async function joinFamily({db, uid, body, nowMs = Date.now(), oa = null, requireFriend = false}) {
   if (await currentMembership(db, uid)) throw fail('BAD_REQUEST', '請先離開目前的照護家庭，再加入其他家庭');
   const {invite, normalized} = await usableInvite(db, body.inviteCode, uid, nowMs);
   // 條件式更新：只有尚未被使用的邀請碼能被認領，避免兩人同時加入
   const claimed = await db.update('family_invites', {code_hash: 'eq.' + sha256(normalized), claimed_by: 'is.null'}, {claimed_by: uid});
   if (!claimed.length && invite.claimed_by !== uid) throw fail('BAD_REQUEST', '邀請碼無效或已過期');
+  // 非好友：先記成待確認（24 小時），加好友的 follow 事件到了才正式綁定
+  if (requireFriend && oa && !(await oa.isFriend(uid))) {
+    await db.upsert('pending_links', [{line_uid: uid, family_id: invite.family_id, role: 'member',
+      created_at: new Date(nowMs).toISOString(), expires_at: new Date(nowMs + DAY_MS).toISOString()}], 'line_uid');
+    return {ok: true, bound: false, pending: true, ...(await familyView(db, invite.family_id))};
+  }
   await db.insertIgnoreDuplicates('members', [{line_uid: uid, family_id: invite.family_id, role: 'member',
     joined_at: new Date(nowMs).toISOString()}], 'line_uid');
   return {ok: true, bound: true, familyId: invite.family_id, role: 'member', ...(await familyView(db, invite.family_id))};
@@ -134,7 +161,7 @@ async function unbind({db, uid}) {
   if (!me) throw fail('BAD_REQUEST', '尚未加入照護家庭');
   if (me.role === 'admin') throw fail('FORBIDDEN', '管理者請使用「刪除照護家庭」');
   await db.remove('members', {line_uid: 'eq.' + uid});
-  return {ok: true, bound: false, unbound: true};
+  return {ok: true, bound: false, unbound: true, _unlinkUids: [uid]};
 }
 
 // 管理者刪除家庭：所有成員解除綁定、邀請碼失效。資料保留（復原功能待補）。
@@ -143,10 +170,96 @@ async function deleteFamily({db, uid, nowMs = Date.now()}) {
   if (!me) throw fail('BAD_REQUEST', '尚未加入照護家庭');
   if (me.role !== 'admin') throw fail('FORBIDDEN', '只有管理者可以刪除家庭');
   const at = new Date(nowMs).toISOString();
+  const everyone = await db.select('members', {select: 'line_uid', family_id: 'eq.' + me.family_id});
   await db.update('families', {family_id: 'eq.' + me.family_id}, {deleted_at: at, deleted_by: uid});
   await db.update('family_invites', {family_id: 'eq.' + me.family_id}, {expires_at: at});
   await db.remove('members', {family_id: 'eq.' + me.family_id});
-  return {ok: true, bound: false, unbound: true, deleted: true};
+  return {ok: true, bound: false, unbound: true, deleted: true, _unlinkUids: everyone.map(row => row.line_uid)};
 }
 
-module.exports = {memberStatus, createFamily, createInvite, previewInvite, joinFamily, unbind, deleteFamily};
+// 3 個月內，刪除的人可以復原；復原後只有他一位成員（管理者），其他人用新邀請重新加入
+async function restoreFamily({db, uid, body, nowMs = Date.now()}) {
+  if (await currentMembership(db, uid)) throw fail('BAD_REQUEST', '請先離開目前的照護家庭，再復原');
+  const familyId = text(body.familyId);
+  const hit = (await restorableFor(db, uid, nowMs)).find(f => f.familyId === familyId);
+  if (!hit) throw fail('BAD_REQUEST', '這個照護家庭已超過復原期限或不存在');
+  const left = await db.select('members', {select: 'line_uid', family_id: 'eq.' + familyId, limit: '1'});
+  if (left.length) throw fail('BAD_REQUEST', '這個照護家庭已有成員');
+  await db.update('families', {family_id: 'eq.' + familyId}, {deleted_at: null, deleted_by: null});
+  await db.insert('members', [{line_uid: uid, family_id: familyId, role: 'admin', joined_at: new Date(nowMs).toISOString()}]);
+  return {ok: true, bound: true, familyId, role: 'admin', ...(await familyView(db, familyId))};
+}
+
+// 成員列表（所有成員都能看；key 與 GAS 相同的算法，前端用來指定對象）
+const memberKeyOf = uid => sha256(uid).slice(0, 16);
+
+async function listMembers({db, uid}) {
+  const me = await currentMembership(db, uid);
+  if (!me) throw fail('NOT_MEMBER', '尚未加入照護家庭');
+  const rows = await db.select('members', {select: 'line_uid,role,display_name,joined_at', family_id: 'eq.' + me.family_id});
+  return {ok: true, bound: true, familyId: me.family_id, role: me.role,
+    members: rows.map(r => ({key: memberKeyOf(r.line_uid), displayName: text(r.display_name), role: r.role,
+      isSelf: r.line_uid === uid, joinedAt: r.joined_at || ''}))};
+}
+
+// 管理者：移除成員（不含自己、不含其他管理者）或把成員升為管理者
+async function changeMember({db, uid, body, promote}) {
+  const me = await currentMembership(db, uid);
+  if (!me) throw fail('NOT_MEMBER', '尚未加入照護家庭');
+  if (me.role !== 'admin') throw fail('FORBIDDEN', '只有管理者可管理成員');
+  const key = text(body.memberKey);
+  const rows = await db.select('members', {select: 'line_uid,role', family_id: 'eq.' + me.family_id});
+  const target = rows.find(r => memberKeyOf(r.line_uid) === key);
+  if (!key || !target) throw fail('BAD_REQUEST', '找不到這位成員');
+  if (target.line_uid === uid) throw fail('BAD_REQUEST', '不能對自己執行這個操作');
+  if (target.role === 'admin') throw fail('BAD_REQUEST', '這位成員已經是管理者');
+  if (promote) {
+    await db.update('members', {line_uid: 'eq.' + target.line_uid}, {role: 'admin'});
+    return {ok: true, bound: true, familyId: me.family_id, role: me.role, promoted: true};
+  }
+  await db.remove('members', {line_uid: 'eq.' + target.line_uid});
+  return {ok: true, bound: true, familyId: me.family_id, role: me.role, removed: true, _unlinkUids: [target.line_uid]};
+}
+
+// 加入其他家庭：先驗證邀請碼，再離開目前的家庭，最後加入。管理者要先刪除目前的家庭（需明確同意）。
+async function switchFamily({db, uid, body, oa = null, requireFriend = false, nowMs = Date.now()}) {
+  const me = await currentMembership(db, uid);
+  if (!me) return joinFamily({db, uid, body, oa, requireFriend, nowMs});
+  const {invite} = await usableInvite(db, body.inviteCode, uid, nowMs);
+  if (invite.family_id === me.family_id) throw fail('BAD_REQUEST', '你已經是這個家庭的成員');
+  if (me.role === 'admin' && body.deleteFamily !== true) {
+    throw fail('BAD_REQUEST', '你是目前家庭的管理者，加入新家庭前要先刪除目前的照護家庭');
+  }
+  let unlink = [];
+  if (me.role === 'admin') {
+    unlink = (await deleteFamily({db, uid, nowMs}))._unlinkUids;
+  } else {
+    await db.remove('members', {line_uid: 'eq.' + uid});
+    unlink = [uid];
+  }
+  const joined = await joinFamily({db, uid, body, oa, requireFriend, nowMs});
+  // 管理者刪除時 unlink 已包含家庭所有人；一般成員只解除自己
+  return {...joined, _unlinkUids: unlink};
+}
+
+// follow 事件（n8n 轉來）：把待確認的人正式綁定。回傳 {activated, reason}。
+async function activatePending({db, uid, nowMs = Date.now()}) {
+  const rows = await db.select('pending_links', {select: '*', line_uid: 'eq.' + uid, limit: '1'});
+  const row = rows[0];
+  const drop = () => db.remove('pending_links', {line_uid: 'eq.' + uid});
+  if (!row || Date.parse(row.expires_at) <= nowMs) { await drop(); return {ok: true, activated: false, reason: 'none'}; }
+  if (await currentMembership(db, uid)) { await drop(); return {ok: true, activated: false, reason: 'bound'}; }
+  const [fam] = await db.select('families', {select: 'family_id,deleted_at', family_id: 'eq.' + row.family_id, limit: '1'});
+  if (!fam || fam.deleted_at) { await drop(); return {ok: true, activated: false, reason: 'family_gone'}; }
+  await db.insertIgnoreDuplicates('members', [{line_uid: uid, family_id: row.family_id, role: row.role,
+    joined_at: new Date(nowMs).toISOString()}], 'line_uid');
+  await drop();
+  return {ok: true, activated: true, reason: '', bound: true, familyId: row.family_id, role: row.role,
+    ...(await familyView(db, row.family_id))};
+}
+
+module.exports = {memberStatus, createFamily, createInvite, previewInvite, joinFamily, unbind, deleteFamily, activatePending,
+  restoreFamily, listMembers,
+  removeMember: ({db, uid, body}) => changeMember({db, uid, body, promote: false}),
+  promoteMember: ({db, uid, body}) => changeMember({db, uid, body, promote: true}),
+  switchFamily};

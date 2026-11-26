@@ -90,6 +90,16 @@ function validSignature(body, signature, secret) {
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
+const WEB_PATHS = new Set(['/api/member', '/api/daily', '/api/dashboard']);
+
+// 網頁動作 → Supabase 版路徑（沒有列出的動作留在 GAS）
+function webToV2(pathname, action) {
+  if (pathname === '/api/member') return '/api/v2/member';
+  if (pathname === '/api/daily') return {read:'/api/v2/daily/read', record:'/api/v2/daily/record', update:'/api/v2/daily/update'}[action] || null;
+  if (pathname === '/api/dashboard') return {getHubData:'/api/v2/dashboard/hub', getDashboardData:'/api/v2/dashboard'}[action] || null;
+  return null;
+}
+
 function createServer(env = process.env, fetcher = fetch) {
   const endpoint = https(env.LIFF_ENDPOINT);
   if (!endpoint || !env.LIFF_ID) throw new Error('LIFF_ENDPOINT and LIFF_ID are required');
@@ -113,7 +123,9 @@ function createServer(env = process.env, fetcher = fetch) {
   // Supabase 版 API（/api/v2/*）：只有設定 SUPABASE_URL 才啟用，和 GAS 並行，尚未切換。
   const v2 = env.SUPABASE_URL && env.SUPABASE_SERVICE_KEY
     ? require('../backend/v2.js').createV2({url: env.SUPABASE_URL, serviceKey: env.SUPABASE_SERVICE_KEY,
-        channelId: env.LINE_LOGIN_CHANNEL_ID, fetcher})
+        channelId: env.LINE_LOGIN_CHANNEL_ID, fetcher, oaToken: env.LINE_OA_ACCESS_TOKEN || '',
+        boundMenu: env.BOUND_RICH_MENU_ID || '', requireFriend: env.REQUIRE_OA_FRIEND === 'true',
+        activateKey: env.ACTIVATE_GATEWAY_KEY || ''})
     : null;
   return http.createServer(async (req, res) => {
     const send = (status, type, data) => {
@@ -126,6 +138,11 @@ function createServer(env = process.env, fetcher = fetch) {
       if (req.method === 'GET' && url.pathname === new URL(endpoint).pathname) {
         const page = url.searchParams.get('page');
         return send(200, 'text/html; charset=utf-8', render(page, env));
+      }
+      // 確認目前跑的是哪一套後端：node+supabase 或 gas
+      if (req.method === 'GET' && url.pathname === '/api/status') {
+        const backend = env.USE_V2_WEB === 'true' && env.SUPABASE_URL ? 'node+supabase' : 'gas';
+        return json(200, {ok:true, backend, commit: String(env.RENDER_GIT_COMMIT || '').slice(0,7) || 'local'});
       }
       const pdfMatch = req.method === 'GET' && /^\/pdf\/([0-9a-f]{32})$/.exec(url.pathname);
       if (pdfMatch) {
@@ -144,11 +161,24 @@ function createServer(env = process.env, fetcher = fetch) {
         return json(out.status, out.body);
       }
       if (req.method !== 'POST' || !Object.hasOwn(upstreams, url.pathname)) return json(404, {ok:false});
+      let rawBody = null; // 已讀取的內容，讓後面的 GAS 轉送可以重用
+      // 網頁的 API 可切到 Supabase 版（USE_V2_WEB=true）。沒有對應的 v2 動作（例如 PDF）仍走 GAS。
+      if (env.USE_V2_WEB === 'true' && v2 && WEB_PATHS.has(url.pathname)) {
+        if (req.headers.origin !== new URL(endpoint).origin) return json(403, {ok:false});
+        rawBody = await readBody(req);
+        let parsed;
+        try { parsed = JSON.parse(rawBody.toString('utf8') || '{}'); } catch { return json(400, {ok:false,error:'格式錯誤'}); }
+        const target = webToV2(url.pathname, parsed.action);
+        if (target) {
+          const out = await v2(target, parsed);
+          return json(out.status, out.body);
+        }
+      }
       const upstream = upstreams[url.pathname];
       if (!upstream) return json(503, {ok:false,error:'[CONFIG] 尚未設定服務'});
       const headers = {'Content-Type':'application/json'};
       if (url.pathname !== '/line/events' && req.headers.origin !== new URL(endpoint).origin) return json(403, {ok:false});
-      const body = await readBody(req);
+      const body = rawBody || await readBody(req);
       if (url.pathname === '/line/events') {
         if (!validSignature(body, req.headers['x-line-signature'], env.LINE_MESSAGING_CHANNEL_SECRET)) return json(401, {ok:false});
         if (!env.LINE_WEBHOOK_GATEWAY_KEY) return json(503, {ok:false});
