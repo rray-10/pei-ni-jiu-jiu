@@ -1,4 +1,4 @@
-<style>
+<style>.topbar{display:flex;align-items:center;gap:8px;padding:2px 0 10px;margin-bottom:6px;border-bottom:1px solid #e5eae5}.topbar.center{justify-content:center;border-bottom:0}.topbar b{font-size:15px;color:#1f4d38}
  #memberGate{--green:#38775c;--green-d:#246044;--light:#eaf4ed;--ink:#25362e;--muted:#697b72;--line:#dce7df;--orange:#e09a55;--cream:#fbf3e8;--red:#a33a2f;
   max-width:520px;margin:0 auto;padding:12px 16px 40px;font:17px/1.55 system-ui,-apple-system,"Noto Sans TC",sans-serif;color:var(--ink)}
  #memberGate *{box-sizing:border-box}
@@ -7,17 +7,26 @@
  #memberGate .ico{width:24px;height:24px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
  #memberGate .gate-brand{display:flex;align-items:center;justify-content:center;gap:10px;padding:8px 0 14px}
  #memberGate .gate-brand svg{width:46px;height:46px}
- #memberGate .gate-brand b{display:block;font-size:24px;line-height:1.15;color:#1f4d38}
+ #memberGate .gate-brand b{display:block;font-size:20px;line-height:1.15;color:#1f4d38}
  #memberGate .gate-brand small{display:block;font-size:15px;color:var(--muted)}
- #memberGate h1{margin:6px 0 10px;text-align:center;font-size:30px;line-height:1.25;color:#1f4d38}
+ #memberGate h1{margin:4px 0 8px;text-align:left;font-size:20px;line-height:1.25;color:#1f4d38}
  #memberGate h1:empty{display:none}
  #memberGate h2{margin:0 0 10px;font-size:22px;line-height:1.3;color:#1f4d38}
  #memberGate h3{margin:0;font-size:19px}
  #memberGate p{margin:0 0 10px}
- #memberGate #memberStatus{display:block;margin:0 auto 14px;padding:8px 16px;width:fit-content;max-width:100%;border-radius:999px;background:#fff;border:1px solid var(--line);color:var(--muted);text-align:center;font-size:16px}
- #memberGate #memberStatus.ok{background:var(--light);border-color:#cfe3d5;color:var(--green-d);font-weight:700}
- #memberGate #memberStatus.error{background:#fdecea;border-color:#f1c2bd;color:var(--red);font-weight:700;border-radius:14px}
+ #memberGate #memberStatus{display:block;margin:0 0 12px;text-align:center;font-size:14px;line-height:1.5;color:var(--muted)}
+ #memberGate #memberStatus.ok{color:var(--green-d);font-weight:600}
+ #memberGate #memberStatus.error{color:var(--red);font-weight:700}
  #memberGate #memberStatus:empty{display:none}
+ #memberGate .block{border:1px solid #cfe0d6;border-radius:14px;padding:14px 16px;margin:0 0 12px;background:#fff}
+ #memberGate .block>.bt{margin:0 0 8px;font-weight:700;color:var(--green-d);font-size:16px}
+ #memberGate .note{display:block;font-size:13px;font-weight:400;color:var(--muted);margin:2px 0 6px}
+ #memberGate details.thr{border:0;border-top:1px solid #e2ece6;border-radius:0;margin:10px 0 0;background:none}
+ #memberGate details.thr summary{min-height:34px;padding:0;white-space:nowrap;font-size:15px;display:flex;align-items:center;justify-content:space-between;gap:8px;list-style:none;font-weight:600;cursor:pointer}
+ #memberGate details.thr summary::-webkit-details-marker{display:none}
+ #memberGate details.thr summary::after{content:'▾';color:var(--muted)}
+ #memberGate details.thr[open] summary::after{content:'▴'}
+ #memberGate details.thr>div{padding:4px 0 8px}
  #memberGate .card,#memberGate form,#memberGate #switchPanel,#memberGate #familyPanel>section{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;margin:0 0 14px;box-shadow:0 2px 10px rgba(56,119,92,.06)}
  #memberGate #familyPanel{display:block;padding:0;margin:0;background:none;border:0;box-shadow:none}
  #memberGate label{display:block;margin:12px 0 4px;font-weight:600}
@@ -32,7 +41,7 @@
  #memberGate summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:600}
  #memberGate button,#memberGate a.btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:52px;margin:10px 0 0;padding:10px 16px;font:inherit;font-weight:700;color:#fff;background:var(--green-d);border:0;border-radius:14px;cursor:pointer;text-decoration:none}
  #memberGate button:disabled{opacity:.55}
- #memberGate button.secondary,#memberGate a.btn.secondary{color:var(--green-d);background:var(--light);border:1px solid #cfe3d5}
+ #memberGate button.secondary,#memberGate a.btn.secondary{color:#4d7f68;background:#fff;border:1px solid #a9cdb9;box-shadow:none}
  #memberGate button.danger{color:var(--red);background:#fff5f4;border:1.5px solid #e3a9a3}
  #memberGate #choose button{justify-content:flex-start;min-height:64px;font-size:19px}
  #memberGate #choose button span{flex:1;text-align:left}
@@ -91,10 +100,7 @@
  <symbol id="i-add" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M19 8v6M16 11h6"/></symbol>
 </svg>
 <main id="memberGate">
- <div class="gate-brand" aria-hidden="true">
-  <svg viewBox="0 0 48 48"><path d="M24 41C10 31 5 24 5 17.5 5 12 9 8 14 8c4 0 8 2.5 10 6.5C26 10.5 30 8 34 8c5 0 9 4 9 9.5C43 24 38 31 24 41z" fill="none" stroke="#38775c" stroke-width="3.5" stroke-linejoin="round"/><path d="M13 24h6l3-6 4 11 3-5h6" fill="none" stroke="#e09a55" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-  <div><b>陪你久久</b><small>照護小幫手</small></div>
- </div>
+ <div class="topbar"><svg viewBox="0 0 48 48" aria-hidden="true" width="26" height="26"><path d="M24 41C10 31 5 24 5 17.5 5 12 9 8 14 8c4 0 8 2.5 10 6.5C26 10.5 30 8 34 8c5 0 9 4 9 9.5C43 24 38 31 24 41z" fill="none" stroke="#38775c" stroke-width="3.5" stroke-linejoin="round"/><path d="M13 24h6l3-6 4 11 3-5h6" fill="none" stroke="#e09a55" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><b>陪你久久</b></div>
  <h1 id="memberHeading"></h1>
  <p id="memberStatus" role="status">正在確認 LINE 與家庭身分…</p>
  <a id="addFriend" class="btn" target="_blank" rel="noopener" hidden>加入官方帳號好友</a>
@@ -106,43 +112,49 @@
    <div id="restoreBox" hidden><h3>可復原的照護家庭</h3><div id="restoreList"></div></div>
   </div>
   <form id="startFamily" hidden>
-   <h2 id="startTitle">建立照護家庭</h2>
    <fieldset id="startStep1">
-    <legend>步驟 1／2　基本資料</legend>
-    <p class="group">這個家庭是為誰建立？</p>
-    <label class="opt"><input type="radio" name="forWhom" value="self" checked>我自己</label>
-    <label class="opt"><input type="radio" name="forWhom" value="proxy">我的家人（我替家人建立）</label>
-    <p id="proxyNotice" hidden>請先取得患者本人同意。建立後你會是管理者；患者本人之後用你產生的邀請連結加入，再由你把他設為管理者。<label class="opt"><input type="checkbox" name="consent">我已取得患者同意</label></p>
-    <label>照護對象的稱呼（家人在畫面上看到的名字）<input name="patientName" required maxlength="60"></label>
-    <label>出生年（選填）<input name="birthYear" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="例如 1956"></label>
-    <p class="group">慢性病（選填，可複選）</p>
-    <label class="opt"><input type="checkbox" name="condition" value="高血壓">高血壓</label>
-    <label class="opt"><input type="checkbox" name="condition" value="糖尿病">糖尿病</label>
-    <label class="opt"><input type="checkbox" name="condition" value="心臟病">心臟病</label>
-    <label class="opt"><input type="checkbox" name="condition" value="腎臟病">腎臟病</label>
-    <label>其他慢性病<input name="conditionOther" maxlength="30"></label>
-    <label>過敏史（選填）<input name="allergies" maxlength="200"></label>
+    <div class="block">
+     <p class="bt">基本資料</p>
+     <label class="opt"><input type="radio" name="forWhom" value="self" checked>我自己</label>
+     <label class="opt"><input type="radio" name="forWhom" value="proxy">我替家人建立</label>
+     <div id="proxyNotice" hidden><p class="note">請先取得患者本人同意。建立後你會是管理者。</p><label class="opt"><input type="checkbox" name="consent">我已取得患者同意</label></div>
+     <label>照護對象的稱呼<input name="patientName" required maxlength="60"></label>
+     <label>出生年<span class="note">選填</span><input name="birthYear" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="例如 1956"></label>
+    </div>
+    <div class="block">
+     <p class="bt">慢性病<span class="note">選填，可複選</span></p>
+     <label class="opt"><input type="checkbox" name="condition" value="高血壓">高血壓</label>
+     <label class="opt"><input type="checkbox" name="condition" value="糖尿病">糖尿病</label>
+     <label class="opt"><input type="checkbox" name="condition" value="心臟病">心臟病</label>
+     <label class="opt"><input type="checkbox" name="condition" value="腎臟病">腎臟病</label>
+     <label>其他<input name="conditionOther" maxlength="30"></label>
+     <label>過敏史<span class="note">選填</span><input name="allergies" maxlength="200"></label>
+    </div>
     <button type="button" id="toStep2">下一步</button>
+    <button type="button" class="secondary back">返回</button>
    </fieldset>
    <fieldset id="startStep2" hidden>
-    <legend>步驟 2／2　要追蹤的項目</legend>
+    <div class="block">
+     <p class="bt">追蹤項目</p>
     <label class="opt"><input type="checkbox" name="metric" value="blood_pressure" checked>血壓（mmHg）</label>
     <label class="opt"><input type="checkbox" name="metric" value="blood_glucose" checked>血糖（mg/dL）</label>
-    <details>
-     <summary>設定警示值（選填，稍後可在追蹤設定修改）</summary>
-     <label>收縮壓下限<input type="number" min="0" max="1000" name="t:blood_pressure:systolicLow"></label>
-     <label>收縮壓上限<input type="number" min="0" max="1000" name="t:blood_pressure:systolicHigh"></label>
-     <label>舒張壓下限<input type="number" min="0" max="1000" name="t:blood_pressure:diastolicLow"></label>
-     <label>舒張壓上限<input type="number" min="0" max="1000" name="t:blood_pressure:diastolicHigh"></label>
-     <label>血糖下限<input type="number" min="0" max="1000" name="t:blood_glucose:alertLow"></label>
-     <label>血糖上限<input type="number" min="0" max="1000" name="t:blood_glucose:alertHigh"></label>
-    </details>
-    <p class="group">用藥（選填，可在追蹤設定修改）</p>
+     <details class="thr">
+          <summary>警示值<span class="note" style="margin:0 0 0 6px">（選填，可在追蹤設定修改）</span></summary><div>
+          <label>收縮壓下限<input type="number" min="0" max="1000" name="t:blood_pressure:systolicLow"></label>
+          <label>收縮壓上限<input type="number" min="0" max="1000" name="t:blood_pressure:systolicHigh"></label>
+          <label>舒張壓下限<input type="number" min="0" max="1000" name="t:blood_pressure:diastolicLow"></label>
+          <label>舒張壓上限<input type="number" min="0" max="1000" name="t:blood_pressure:diastolicHigh"></label>
+          <label>血糖下限<input type="number" min="0" max="1000" name="t:blood_glucose:alertLow"></label>
+          <label>血糖上限<input type="number" min="0" max="1000" name="t:blood_glucose:alertHigh"></label>
+         </div></details>
+    </div>
+    <div class="block" id="medBlock">
+     <p class="bt">用藥 <span class="note" style="display:inline;margin:0">（選填，可在追蹤設定修改）</span></p>
     <div id="medAdd">
      <div id="medChips"></div>
      <button type="button" id="medOpen" class="secondary">＋ 新增藥物</button>
-     <div id="medForm" hidden>
-      <label>藥名<input id="medName" maxlength="60" autocomplete="off"></label>
+     <div id="bindMedForm" hidden>
+      <label>藥名<input id="bindMedName" maxlength="60" autocomplete="off"></label>
       <fieldset id="medSlotsWrap" hidden>
        <legend>服用時段</legend>
        <label class="opt"><input type="checkbox" class="medSlot" value="早餐後">早餐後</label>
@@ -154,13 +166,12 @@
       <button type="button" id="medCancelAdd" class="secondary">取消</button>
      </div>
     </div>
+    </div>
     <button>確認建立</button>
     <button type="button" id="backStep1" class="secondary">上一步</button>
    </fieldset>
-   <button type="button" class="secondary back">返回</button>
   </form>
   <form id="joinFamily" hidden>
-   <h2>加入家人的照護家庭</h2>
    <fieldset id="joinStep1">
     <label>家人提供的邀請碼<input name="inviteCode" required autocomplete="off" minlength="32" maxlength="32"></label>
     <button>確認邀請碼</button>

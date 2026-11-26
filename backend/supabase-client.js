@@ -27,7 +27,7 @@ function createSupabase({url, serviceKey, fetcher = fetch}) {
     insertIgnoreDuplicates: (table, rows, onConflict) =>
       request('POST', table, {on_conflict: onConflict}, rows, {headers: {Prefer: 'resolution=ignore-duplicates,return=representation'}}),
     update: (table, query, patch) => request('PATCH', table, query, patch, {headers: {Prefer: 'return=representation'}}),
-    remove: (table, query) => request('DELETE', table, query)
+    remove: (table, query) => request('DELETE', table, query, undefined, {headers: {Prefer: 'return=representation'}})
   };
 }
 

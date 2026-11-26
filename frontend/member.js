@@ -68,7 +68,7 @@ window.hubSession = (async () => {
           return link;
         }));
       $('retryMenu').hidden = data.menu !== 'retry';
-      status(cfg.page === 'appointments' ? '請返回 LINE 官方帳號，傳送「回診管理」。' : '已綁定照護家庭','ok');
+      status(cfg.page === 'appointments' ? '請返回 LINE 官方帳號，傳送「回診管理」。' : '','ok');
       if (cfg.page === 'member') loadMembers();
     }
     function finish(data) {
@@ -236,8 +236,10 @@ window.hubSession = (async () => {
     $('memberHeading').textContent = '綁定照護家庭';
     checkFriend();
     document.addEventListener('visibilitychange', () => { if (!document.hidden) checkFriend(); });
+    const titles = {choose:'綁定照護家庭', startFamily:'建立照護家庭', joinFamily:'加入照護家庭'};
     const show = id => {
       for (const name of ['choose','startFamily','joinFamily']) $(name).hidden = name !== id;
+      $('memberHeading').textContent = titles[id];
     };
     const restorable = data.restorable || [];
     $('restoreBox').hidden = !restorable.length;
@@ -316,7 +318,7 @@ window.hubSession = (async () => {
       // 用藥（選填）：藥名 → 服用時段，不填就不送出
       const medications = [];
       const medShowSave = () => { const slots = [...document.querySelectorAll('.medSlot')].some(c => c.checked);
-        $('medSlotsWrap').hidden = !$('medName').value.trim(); $('medSave').hidden = !($('medName').value.trim() && slots); };
+        $('medSlotsWrap').hidden = !$('bindMedName').value.trim(); $('medSave').hidden = !($('bindMedName').value.trim() && slots); };
       const medRender = () => {
         $('medChips').replaceChildren(...medications.map((m, i) => {
           const chip = document.createElement('div');
@@ -329,13 +331,13 @@ window.hubSession = (async () => {
           return chip;
         }));
       };
-      const medReset = () => { $('medName').value = ''; document.querySelectorAll('.medSlot').forEach(c => { c.checked = false; }); $('medForm').hidden = true; $('medOpen').hidden = false; medShowSave(); };
-      $('medOpen').onclick = () => { $('medForm').hidden = false; $('medOpen').hidden = true; $('medName').focus(); };
+      const medReset = () => { $('bindMedName').value = ''; document.querySelectorAll('.medSlot').forEach(c => { c.checked = false; }); $('bindMedForm').hidden = true; $('medOpen').hidden = false; medShowSave(); };
+      $('medOpen').onclick = () => { $('bindMedForm').hidden = false; $('medOpen').hidden = true; $('bindMedName').focus(); };
       $('medCancelAdd').onclick = medReset;
-      $('medName').addEventListener('input', medShowSave);
+      $('bindMedName').addEventListener('input', medShowSave);
       document.querySelectorAll('.medSlot').forEach(c => c.addEventListener('change', medShowSave));
       $('medSave').onclick = () => {
-        const name = $('medName').value.trim();
+        const name = $('bindMedName').value.trim();
         const slots = [...document.querySelectorAll('.medSlot')].filter(c => c.checked).map(c => c.value);
         if (!name || !slots.length || medications.length >= 10) return;
         medications.push({name, slots}); medRender(); medReset();

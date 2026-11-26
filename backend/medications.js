@@ -7,6 +7,15 @@ const SLOTS = ['早餐後', '午餐後', '晚餐後', '睡前'];
 
 function fail(code, message) { return Object.assign(new Error(message), {code}); }
 const text = v => String(v == null ? '' : v).trim();
+// 同名判斷：忽略前後空白、大小寫、連續空白
+const nameKey = v => text(v).replace(/\s+/g, ' ').toLowerCase();
+
+// 同一家庭的啟用中藥物不能重複（停用的不算，可以重新新增）
+async function assertUniqueName(db, familyId, name, exceptId = '') {
+  const rows = await db.select('medications', {select: 'medication_id,name', family_id: 'eq.' + familyId, active: 'eq.true'});
+  const dup = rows.find(r => r.medication_id !== exceptId && nameKey(r.name) === nameKey(name));
+  if (dup) throw fail('BAD_REQUEST', `已有同名的藥物「${dup.name}」，請直接修改它`);
+}
 
 async function membershipOf(db, uid) {
   const rows = await db.select('members', {select: 'family_id,role', line_uid: 'eq.' + uid, limit: '1'});
@@ -48,6 +57,7 @@ async function saveMedication({db, uid, body, nowMs = Date.now()}) {
   const fields = parseInput(body);
   const at = new Date(nowMs).toISOString();
   const id = text(body.medicationId);
+  await assertUniqueName(db, familyId, fields.name, id);
   if (id) {
     const hit = await db.update('medications', {medication_id: 'eq.' + id, family_id: 'eq.' + familyId, active: 'eq.true'},
       {...fields, updated_at: at});
@@ -80,9 +90,21 @@ async function insertMedications({db, familyId, uid, list, nowMs = Date.now()}) 
   const rows = parseBatch(list);
   const at = new Date(nowMs).toISOString();
   if (!rows.length) return 0;
+  const keys = rows.map(r => nameKey(r.name));
+  if (new Set(keys).size !== keys.length) throw fail('BAD_REQUEST', '同一次不能重複新增同名的藥物');
   await db.insert('medications', rows.map(fields => ({medication_id: 'M_' + randomBytes(12).toString('hex'),
     family_id: familyId, ...fields, active: true, created_by: uid, created_at: at, updated_at: at})));
   return rows.length;
 }
 
-module.exports = {SLOTS, parseBatch, insertMedications, listMedications, saveMedication, disableMedication};
+// 刪除（只用於輸入錯誤）：整筆刪除。打卡紀錄不連到藥物 ID，不受影響。只有管理者能刪除。
+async function deleteMedication({db, uid, body}) {
+  const familyId = await adminFamilyId(db, uid);
+  const id = text(body.medicationId);
+  if (!id) throw fail('BAD_REQUEST', '找不到這筆藥物');
+  const hit = await db.remove('medications', {medication_id: 'eq.' + id, family_id: 'eq.' + familyId});
+  if (hit && hit.length === 0) throw fail('BAD_REQUEST', '找不到這筆藥物，請重新整理頁面');
+  return listMedications({db, uid});
+}
+
+module.exports = {SLOTS, parseBatch, insertMedications, listMedications, saveMedication, disableMedication, deleteMedication};

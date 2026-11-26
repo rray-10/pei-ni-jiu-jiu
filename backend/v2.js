@@ -83,6 +83,7 @@ function createV2({url, serviceKey, channelId, fetcher = fetch, oaToken = '', bo
       if (path === '/api/v2/medication/list') return {status: 200, body: await medications.listMedications({db, uid: lineUid})};
       if (path === '/api/v2/medication/save') return {status: 200, body: await medications.saveMedication({db, uid: lineUid, body})};
       if (path === '/api/v2/medication/disable') return {status: 200, body: await medications.disableMedication({db, uid: lineUid, body})};
+      if (path === '/api/v2/medication/delete') return {status: 200, body: await medications.deleteMedication({db, uid: lineUid, body})};
       if (path === '/api/v2/dashboard/pdf') {
         const days = Number(body.days || 7);
         if (![7, 30, 90].includes(days)) return {status: 400, body: {ok: false, error: '期間無效'}};

@@ -96,7 +96,7 @@ const WEB_PATHS = new Set(['/api/member', '/api/daily', '/api/dashboard']);
 function webToV2(pathname, action) {
   if (pathname === '/api/member') return '/api/v2/member';
   if (pathname === '/api/daily') return {read:'/api/v2/daily/read', record:'/api/v2/daily/record', update:'/api/v2/daily/update',
-    medicationList:'/api/v2/medication/list', medicationSave:'/api/v2/medication/save', medicationDisable:'/api/v2/medication/disable'}[action] || null;
+    medicationList:'/api/v2/medication/list', medicationSave:'/api/v2/medication/save', medicationDisable:'/api/v2/medication/disable', medicationDelete:'/api/v2/medication/delete'}[action] || null;
   if (pathname === '/api/dashboard') return {getHubData:'/api/v2/dashboard/hub', getDashboardData:'/api/v2/dashboard', generateVisitPdf:'/api/v2/dashboard/pdf'}[action] || null;
   return null;
 }
