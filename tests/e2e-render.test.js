@@ -155,3 +155,85 @@ test('已綁定時，頁面資料與會員狀態同時請求，且只請求一�
     }
   } finally { await browser.close(); }
 });
+
+test('離開、刪除、復原都要先按彈窗確認；管理者離開時可選刪除或指定新管理者', { skip: !chromium }, async () => {
+  const browser = await chromium.launch(browserOptions);
+  try {
+    const {render} = require('../frontend/server');
+    const open = async (status, members) => {
+      const page = await browser.newPage({viewport:{width:375,height:700}});
+      await page.route('https://static.line-scdn.net/**', route => route.fulfill({contentType:'application/javascript',
+        body:'window.liff={init:async()=>{},isLoggedIn:()=>true,getAccessToken:()=>"t"};'}));
+      const fake = `window.sent=[];window.fetch=async (url,opts)=>{
+        const body=JSON.parse(opts.body);window.sent.push(body);
+        if(body.action==='memberStatus')return Response.json(${JSON.stringify(status)});
+        if(body.action==='listMembers')return Response.json({ok:true,bound:true,role:'admin',members:${JSON.stringify(members)}});
+        if(body.action==='unbind')return Response.json({ok:true,bound:false,unbound:true,deleted:!!body.deleteFamily||${members.length===1},restoreUntil:'2027-02-26T00:00:00Z'});
+        if(body.action==='restoreFamily')return Response.json({ok:true,bound:true,role:'admin',patientName:'阿嬤'});
+        return Response.json({ok:true,bound:false,unbound:true});};`;
+      await page.setContent(render('member',{LIFF_ENDPOINT:'https://hub.example.test/',LIFF_ID:'fixture'})
+        .replace('<head>', () => '<head><script>' + fake + '</script>'));
+      return page;
+    };
+    const actions = page => page.evaluate(() => window.sent.map(item => item.action).filter(a => !['memberStatus','listMembers'].includes(a)));
+    const shot = async (page, name) => { if (SHOTS) await page.screenshot({path:path.join(SHOTS, name + '.png')}); };
+    const admin = {ok:true,bound:true,role:'admin',patientName:'阿嬤'};
+    const me = {key:'a',displayName:'我',role:'admin',isSelf:true};
+    const other = {key:'b',displayName:'家人',role:'member',isSelf:false};
+
+    // admin with another member: choice dialog, cancel does nothing
+    let page = await open(admin,[me,other]);
+    await page.getByRole('button',{name:'離開照護家庭'}).click();
+    await page.locator('#modal').waitFor();
+    assert.equal(await page.isVisible('#modalExtra'), true);
+    await shot(page,'leave-choice');
+    await page.click('#modalCancel');
+    assert.deepEqual(await actions(page), []);
+
+    // choose: delete the family for everyone
+    await page.getByRole('button',{name:'離開照護家庭'}).click();
+    await page.click('#modalOk');
+    await page.locator('#restart').waitFor();
+    assert.deepEqual(await actions(page), ['unbind']);
+    assert.equal(await page.evaluate(() => window.sent.find(item => item.action === 'unbind').deleteFamily), true);
+    assert.match(await page.textContent('#memberStatus'), /2027\/2\/26/);
+
+    // choose: hand over to a member, then leave
+    page = await open(admin,[me,other]);
+    await page.getByRole('button',{name:'離開照護家庭'}).click();
+    await page.click('#modalExtra');
+    await page.locator('#modalOptions button',{hasText:'家人'}).waitFor();
+    await page.locator('#modalOptions button',{hasText:'家人'}).click();
+    await page.locator('#restart').waitFor();
+    assert.equal(await page.evaluate(() => window.sent.find(item => item.action === 'unbind').promoteMemberKey), 'b');
+
+    // admin alone: leaving is deleting, confirm first
+    page = await open(admin,[me]);
+    await page.getByRole('button',{name:'離開照護家庭'}).click();
+    await page.locator('#modal').waitFor();
+    assert.match(await page.textContent('#modalText'), /將被刪除/);
+    assert.deepEqual(await actions(page), []);
+    await page.click('#modalOk');
+    await page.locator('#restart').waitFor();
+
+    // member: plain leave, explains the invite route
+    page = await open({ok:true,bound:true,role:'member',patientName:'阿嬤'},[other]);
+    await page.getByRole('button',{name:'解除綁定'}).click();
+    await page.locator('#modal').waitFor();
+    assert.match(await page.textContent('#modalText'), /邀請連結再次加入/);
+    assert.deepEqual(await actions(page), []);
+    await page.click('#modalOk');
+    await page.locator('#restart').waitFor();
+    assert.deepEqual(await actions(page), ['unbind']);
+
+    // restore after deletion: confirm first, then restored as the only admin
+    page = await open({ok:true,bound:false,restorable:[{familyId:'F_x',patientName:'阿嬤',restoreUntil:'2027-02-26T00:00:00Z'}]},[]);
+    await page.getByRole('button',{name:'復原「阿嬤」'}).waitFor();
+    await shot(page,'restore');
+    await page.getByRole('button',{name:'復原「阿嬤」'}).click();
+    assert.deepEqual(await actions(page), []);
+    await page.click('#modalOk');
+    await page.locator('#familyPanel').waitFor();
+    assert.deepEqual(await actions(page), ['restoreFamily']);
+  } finally { await browser.close(); }
+});

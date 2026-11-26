@@ -125,7 +125,8 @@ test('F1 GAS POST writes live headers, dedupes retries, and dashboard POST scope
   const sandbox = {
     Date,PropertiesService:{getScriptProperties:() => ({getProperty:key => props[key] ?? null})},
     SpreadsheetApp:{openById:() => sheet,flush(){}},
-    Utilities:{formatDate:() => new Date().toISOString()},
+    Utilities:{formatDate:() => new Date().toISOString(),DigestAlgorithm:{SHA_256:'sha256'},Charset:{UTF_8:'utf8'},
+      computeDigest:(_,value) => [...require('node:crypto').createHash('sha256').update(value).digest()]},
     ContentService:{MimeType:{JSON:'json'},createTextOutput:body => ({setMimeType:() => JSON.parse(body)})},
     LockService:{getScriptLock:() => ({waitLock(){},hasLock:() => true,releaseLock(){}})},
     UrlFetchApp:{fetch(url,options) {
@@ -213,4 +214,31 @@ test('setupN8nTabs adds only the missing tabs with the headers the workflow read
   assert.deepEqual(Object.keys(created),['notification_log','med_logs']);
   const documented = readFileSync('n8n/README.md','utf8');
   for (const headers of Object.values(created)) assert.ok(documented.includes(headers.join(',')));
+});
+
+test('day-over-day warnings compare the same period yesterday and honour family thresholds', () => {
+  const context = vm.createContext({Utilities:{formatDate:date => new Date(date.getTime()+8*3600000).toISOString().slice(0,10)}});
+  vm.runInContext(readFileSync('gas/daily/Api.gs','utf8') + ';this.warn = f1Warnings_;',context);
+  const old = (metricKey,extra) => ({familyId:'F',metricKey,period:'morning',unit:metricKey === 'blood_glucose' ? 'mg/dL' : 'mmHg',
+    recordDate:'2026-11-25',createdAt:'2026-11-25T00:00:00Z',...extra});
+  const now = [
+    {familyId:'F',metricKey:'blood_pressure',period:'morning',unit:'mmHg',recordDate:'2026-11-26',valueSystolic:142,valueDiastolic:84},
+    {familyId:'F',metricKey:'blood_glucose',period:'morning',unit:'mg/dL',recordDate:'2026-11-26',valueNumeric:90}
+  ];
+  const catalog = thresholds => ({metrics:[{metricKey:'blood_pressure',metricName:'血壓',inputType:'bloodPressure',...thresholds},
+    {metricKey:'blood_glucose',metricName:'血糖',inputType:'number',...thresholds}]});
+  const history = [
+    old('blood_pressure',{value:'118/80',valueSystolic:'',valueDiastolic:''}),           // legacy row: value column only
+    old('blood_glucose',{valueNumeric:200,createdAt:'2026-11-25T00:00:00Z'}),
+    old('blood_glucose',{valueNumeric:150,createdAt:'2026-11-25T01:00:00Z'}),            // latest of the day wins
+    old('blood_glucose',{valueNumeric:400,familyId:'OTHER',createdAt:'2026-11-25T02:00:00Z'}),
+    old('blood_glucose',{valueNumeric:400,period:'evening'}),
+    old('blood_glucose',{valueNumeric:400,recordDate:'2026-11-24'})
+  ];
+  const result = JSON.parse(JSON.stringify(context.warn(history,now,catalog({}),'Asia/Taipei'))); // out of the vm realm
+  assert.deepEqual(result.map(w => [w.metricName,w.previous,w.current,w.delta,w.threshold]),
+    [['血壓（收縮壓）',118,142,24,20],['血糖',150,90,-60,50]]);
+  assert.equal(context.warn(history,now,catalog({systolicChangeThreshold:0,diastolicChangeThreshold:3,changeThreshold:100}),'Asia/Taipei')
+    .map(w => w.metricName).join(),'血壓（舒張壓）');
+  assert.equal(context.warn([],now,catalog({}),'Asia/Taipei').length,0);
 });

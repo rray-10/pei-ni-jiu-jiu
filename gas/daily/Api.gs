@@ -86,6 +86,46 @@ function f1Metrics_(ss, familyId, settingsTable) {
   return {metrics,settings};
 }
 
+// 前日差異提醒的一般參考值（非醫療標準）。家庭在追蹤設定填了「相差提醒」就用家庭的值，填 0 關閉。
+const F1_CHANGE_DEFAULTS = {systolic:20,diastolic:15,blood_glucose:50,blood_glucose_mmol:2.8,temperature:1,weight:2,spo2:4};
+
+function f1Day_(value, timeZone) {
+  return value instanceof Date ? Utilities.formatDate(value,timeZone,'yyyy-MM-dd') : f1Text_(value).slice(0,10).replace(/\//g,'-');
+}
+
+/** 本次紀錄和「前一天、同一時段、同單位」的最新一筆比較；沒有可比的紀錄就不提醒。 */
+function f1Warnings_(history, rows, catalog, timeZone) {
+  const warnings = [];
+  for (const row of rows) {
+    const def = catalog.metrics.find(metric => metric.metricKey === row.metricKey);
+    if (def.inputType === 'boolean') continue;
+    const yesterday = new Date(Date.parse(row.recordDate + 'T00:00:00Z') - 86400000).toISOString().slice(0,10);
+    const previous = history.filter(old => old.familyId === row.familyId && old.metricKey === row.metricKey &&
+        old.period === row.period && f1Text_(old.unit) === f1Text_(row.unit) && f1Day_(old.recordDate,timeZone) === yesterday &&
+        old.source !== 'TEST' && !/^false$/i.test(f1Text_(old.isRecorded)))
+      .sort((a,b) => (Date.parse(a.createdAt) || 0) - (Date.parse(b.createdAt) || 0)).pop();
+    if (!previous) continue;
+    const fallbackKey = row.metricKey === 'blood_glucose' && /mmol/i.test(row.unit) ? 'blood_glucose_mmol' : row.metricKey;
+    const parts = def.inputType === 'bloodPressure'
+      ? [['（收縮壓）','valueSystolic',0,def.systolicChangeThreshold,F1_CHANGE_DEFAULTS.systolic],
+         ['（舒張壓）','valueDiastolic',1,def.diastolicChangeThreshold,F1_CHANGE_DEFAULTS.diastolic]]
+      : [['','valueNumeric',0,def.changeThreshold,F1_CHANGE_DEFAULTS[fallbackKey]]];
+    for (const [label,column,index,own,fallback] of parts) {
+      const threshold = own == null ? fallback : own;
+      // 舊資料可能只有 value 欄（血壓為 "132/84"）
+      const stored = f1Text_(previous[column]) || f1Text_(previous.value).split('/')[index] || '';
+      const before = stored === '' ? NaN : Number(stored);
+      const current = Number(row[column]);
+      if (!(threshold > 0) || !Number.isFinite(before)) continue;
+      const delta = Math.round((current - before) * 10) / 10;
+      if (Math.abs(delta) >= threshold) {
+        warnings.push({metricKey:row.metricKey,metricName:def.metricName + label,unit:row.unit,previous:before,current,delta,threshold});
+      }
+    }
+  }
+  return warnings;
+}
+
 function f1Record_(ss, body, ctx, catalog, uid, now) {
   const date = f1Text_(body.recordDate);
   const parsed = new Date(date + 'T00:00:00Z');
@@ -119,8 +159,9 @@ function f1Record_(ss, body, ctx, catalog, uid, now) {
   if (!rows.length) f1Fail_('請至少輸入一個項目');
   const table = f1Table_(ss,'DailyRecords',['recordId','familyId','lineUid','recordedAt','metricKey','metricName','value','unit','note','source','recordDate','period']);
   const existing = new Set(table.rows.map(row => row.recordId));
+  const warnings = f1Warnings_(table.rows,rows,catalog,ss.getSpreadsheetTimeZone());
   f1Append_(table,rows.filter(row => !existing.has(row.recordId)));
-  return {savedCount:rows.length,recordedAt:now,recordDate:date,period:body.period,warnings:[]};
+  return {savedCount:rows.length,recordedAt:now,recordDate:date,period:body.period,warnings};
 }
 
 function f1Settings_(table, input, ctx, catalog, uid, now) {
@@ -161,7 +202,8 @@ function f1Request_(body) {
   let lock;
   let out;
   let menuTask;
-  let unlinkUid;
+  let unlinkUids = [];
+  let notify = null;
   try {
 
     const memberAction = MEMBER_ACTIONS.includes(body.action);
@@ -177,8 +219,12 @@ function f1Request_(body) {
     const ss = SpreadsheetApp.openById(props.getProperty('F1_SPREADSHEET_ID'));
     if (memberAction) {
       out = membership_(ss,uid,body);
-      if (out.bound && ['createFamily','joinFamily','switchFamily','syncMenu'].includes(body.action)) menuTask = {uid,props};
-      if (out._unlinkUid) { unlinkUid = out._unlinkUid; delete out._unlinkUid; }
+      if (out.bound && ['createFamily','joinFamily','switchFamily','restoreFamily','syncMenu'].includes(body.action)) menuTask = {uid,props};
+      // userId 只在後端用來切換選單、發通知，不回傳給瀏覽器
+      unlinkUids = out._unlinkUids || [];
+      notify = out._notify || null;
+      delete out._unlinkUids;
+      delete out._notify;
       if (out.unbound) menuTask = {uid,props,unlink:true};
     } else {
       const ctx = f1Context_(ss,uid);
@@ -198,7 +244,11 @@ function f1Request_(body) {
   } finally {
     if (lock && lock.hasLock()) lock.releaseLock();
   }
-  if (unlinkUid && out.ok) unlinkMemberMenu_(unlinkUid,PropertiesService.getScriptProperties());
+  if (out.ok) {
+    const props2 = PropertiesService.getScriptProperties();
+    unlinkUids.forEach(other => unlinkMemberMenu_(other,props2));
+    if (notify) memberPush_(notify.uids,notify.text,props2);
+  }
   if (menuTask && out.ok) out.menu = menuTask.unlink ? unlinkMemberMenu_(menuTask.uid,menuTask.props) : syncMemberMenu_(menuTask.uid,menuTask.props);
   return out;
 }

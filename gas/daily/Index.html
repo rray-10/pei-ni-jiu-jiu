@@ -105,7 +105,7 @@
   function showSavedAndReturn(warnings=[]){
     $("recordForm").classList.add("hidden");$("returnCard").classList.remove("hidden");$("status").textContent="";
     const list=$("warningList");list.replaceChildren();
-    if(warnings.length){$("returnTitle").textContent="紀錄已儲存，請留意數值變化";warnings.forEach(w=>{const p=document.createElement("p");p.className="alert warn";const change=Number(w.delta);p.textContent=`${w.metricName||w.label||w.metricKey}：前日 ${w.previous}${w.unit||""} → 今日 ${w.current}${w.unit||""}（${change>0?"增加":"減少"} ${Math.abs(change)}${w.unit||""}，達到提醒門檻 ${w.threshold}${w.unit||""}）。此提醒僅供參考，請依醫療人員建議判讀。`;list.append(p);});$("returnMessage").textContent="提醒已顯示，5 秒後返回 LINE；也可以立即返回。";showToast("請留意下方提醒",1800);window.setTimeout(()=>returnToLine(true),5000);}
+    if(warnings.length){$("returnTitle").textContent="紀錄已儲存，請留意數值變化";warnings.forEach(w=>{const p=document.createElement("p");p.className="alert warn";const change=Number(w.delta);p.textContent=`${w.metricName||w.label||w.metricKey}：前一天同時段 ${w.previous}${w.unit||""} → 本次 ${w.current}${w.unit||""}（${change>0?"增加":"減少"} ${Math.abs(change)}${w.unit||""}，達到提醒門檻 ${w.threshold}${w.unit||""}）。此提醒僅供參考，請依醫療人員建議判讀。`;list.append(p);});$("returnMessage").textContent="提醒已顯示，5 秒後返回 LINE；也可以立即返回。";showToast("請留意下方提醒",1800);window.setTimeout(()=>returnToLine(true),5000);}
     else {$("returnTitle").textContent="紀錄已儲存";$("returnMessage").textContent="即將返回 LINE 官方帳號…";showToast("即將返回 LINE…",2000,()=>returnToLine(true));}
   }
   function showToast(hint,duration,done){

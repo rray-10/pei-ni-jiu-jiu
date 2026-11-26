@@ -70,6 +70,12 @@
  #memberList li .actions button{width:auto;min-height:44px;margin:0;padding:6px 14px;font-size:16px}
  #memberList li .actions button.secondary{background:#fff;border:1.5px solid var(--green)}
  #unbind{margin-top:6px}
+ #memberGate #restoreBox{margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
+ #memberGate #restoreBox p{margin:0;color:var(--muted);font-size:16px}
+ #memberGate .modal{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.45)}
+ #memberGate .modal>div{width:100%;max-width:360px;max-height:100%;overflow:auto;padding:20px;background:#fff;border-radius:18px;box-shadow:0 12px 32px rgba(0,0,0,.25)}
+ #memberGate #modalText{white-space:pre-line}
+ #memberGate #modalOk.danger{color:#fff;background:var(--red);border-color:var(--red)}
 </style>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
  <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></symbol>
@@ -97,6 +103,7 @@
    <svg class="hero" viewBox="0 0 150 110" aria-hidden="true"><path d="M10 58L75 8l65 50" fill="none" stroke="#bcd9c6" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="58" cy="66" r="16" fill="#cfe3d5"/><circle cx="92" cy="68" r="15" fill="#fbe9d2"/><path d="M30 104c0-14 12-22 28-22s28 8 28 22M70 104c0-12 10-20 22-20s24 8 24 20" fill="#cfe3d5" opacity=".8"/><path d="M75 36c-4-6-12-2-9 4 2 3 9 8 9 8s7-5 9-8c3-6-5-10-9-4z" fill="#e09a55" opacity=".75"/></svg>
    <button type="button" id="chooseStart"><svg class="ico"><use href="#i-person"/></svg><span>建立照護家庭</span><svg class="ico chev"><use href="#i-chev"/></svg></button>
    <button type="button" id="chooseJoin" class="secondary"><svg class="ico"><use href="#i-link"/></svg><span>加入家人的照護家庭</span><svg class="ico chev"><use href="#i-chev"/></svg></button>
+   <div id="restoreBox" hidden><h3>可復原的照護家庭</h3><div id="restoreList"></div></div>
   </div>
   <form id="startFamily" hidden>
    <h2 id="startTitle">建立照護家庭</h2>
@@ -177,6 +184,10 @@
    <ul id="memberList"></ul>
   </section>
   <button id="retryMenu" class="secondary" hidden>重試更新 LINE 選單</button>
-  <button id="unbind" class="danger"><svg class="ico"><use href="#i-trash"/></svg>解除綁定</button>
+  <button id="unbind" class="danger"><svg class="ico"><use href="#i-trash"/></svg><span id="unbindLabel">解除綁定</span></button>
  </section>
+ <button type="button" id="restart" hidden>回到建立或加入家庭</button>
+ <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
+  <div><h2 id="modalTitle"></h2><p id="modalText"></p><div id="modalOptions"></div><button type="button" id="modalOk" class="danger"></button><button type="button" id="modalExtra" class="secondary" hidden></button><button type="button" id="modalCancel" class="secondary">取消</button></div>
+ </div>
 </main>
