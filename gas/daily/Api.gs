@@ -283,7 +283,7 @@ function f1Request_(body) {
         f1Settings_(table,body.settings,ctx,catalog,uid,now);
         out = {...ctx,...f1Metrics_(ss,ctx.familyId,f1Table_(ss,'TrackingSettings',['familyId','metricKey','enabled','updatedAt']))};
       }
-      if (body.action === 'read') out = {...ctx,...catalog};
+      if (body.action === 'read') out = {...ctx,...catalog,patientName:memberFamily_(ss,ctx.familyId).patientName};
     }
     out = {ok:true,...out};
   } catch (err) {

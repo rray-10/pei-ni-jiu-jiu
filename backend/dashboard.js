@@ -24,7 +24,7 @@ async function buildSource({db, lineUid, days, nowMs = Date.now()}) {
   const today = taipeiToday(nowMs);
   const since = isoDate(new Date(Date.parse(today) - (days - 1) * 86400000));
 
-  const [families, members, links, records, appts] = await Promise.all([
+  const [families, members, links, records, appts, settings] = await Promise.all([
     db.select('families', {select: 'family_id,patient_name,birth_year,conditions,allergies', family_id: 'eq.' + familyId, deleted_at: 'is.null'}),
     db.select('members', {select: 'family_id,line_uid,role,display_name', family_id: 'eq.' + familyId}),
     db.select('family_patients', {select: 'family_id,patient_id', family_id: 'eq.' + familyId}),
@@ -33,7 +33,8 @@ async function buildSource({db, lineUid, days, nowMs = Date.now()}) {
       and: `(record_date.gte.${since},record_date.lte.${today})`,
       order: 'record_date.desc,recorded_at.desc'
     }),
-    db.select('appointments', {select: '*', family_id: 'eq.' + familyId})
+    db.select('appointments', {select: '*', family_id: 'eq.' + familyId}),
+    db.select('tracking_settings', {select: 'metric_key,enabled,systolic_low,systolic_high,diastolic_low,diastolic_high,alert_low,alert_high', family_id: 'eq.' + familyId})
   ]);
   const src = {
     families: families.map(f => ({familyId: f.family_id, patientName: f.patient_name, birthYear: f.birth_year ?? '',
@@ -44,12 +45,25 @@ async function buildSource({db, lineUid, days, nowMs = Date.now()}) {
     appointments: appts.map(a => ({appt_id: a.appt_id, patient_id: a.patient_id, date: a.date, session: a.session || '',
       hospital: a.hospital || '', department: a.department || '', status: a.status}))
   };
-  return {src, nowIso: new Date(nowMs).toISOString()};
+  return {src, nowIso: new Date(nowMs).toISOString(), targets: targetsFrom(settings)};
+}
+
+// 目標範圍：血壓（收縮、舒張）、血糖。只有上下限都填了才回傳，前端據此畫淺色帶。
+function targetsFrom(rows) {
+  const by = new Map(rows.map(r => [r.metric_key, r]));
+  const range = (row, low, high) => {
+    if (!row || row[low] == null || row[high] == null) return null;
+    return {low: Number(row[low]), high: Number(row[high])};
+  };
+  const bp = by.get('blood_pressure'), glucose = by.get('blood_glucose');
+  return {systolic: range(bp, 'systolic_low', 'systolic_high'), diastolic: range(bp, 'diastolic_low', 'diastolic_high'),
+    glucose: range(glucose, 'alert_low', 'alert_high')};
 }
 
 async function loadDashboard(args) {
-  const {src, nowIso} = await buildSource(args);
-  return DashboardService.getDashboardData(src, args.lineUid, null, args.days, nowIso);
+  const {src, nowIso, targets} = await buildSource(args);
+  const dashboard = DashboardService.getDashboardData(src, args.lineUid, null, args.days, nowIso);
+  return {...dashboard, targets};
 }
 
 // 就診摘要：與 GAS getVisitSummary 相同（含最高／最低）
@@ -58,4 +72,4 @@ async function loadVisitSummary(args) {
   return DashboardService.getVisitSummary(src, args.lineUid, null, args.days, nowIso);
 }
 
-module.exports = {loadDashboard, loadVisitSummary, legacyRecord, taipeiToday};
+module.exports = {loadDashboard, loadVisitSummary, legacyRecord, taipeiToday, targetsFrom};

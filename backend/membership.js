@@ -5,6 +5,7 @@ const {createHash, randomBytes} = require('node:crypto');
 
 const sha256 = value => createHash('sha256').update(value).digest('hex');
 const DAY_MS = 24 * 3600 * 1000;
+const {parseBatch, insertMedications} = require('./medications.js');
 const DEFAULT_METRICS = ['blood_pressure', 'blood_glucose'];
 const THRESHOLD_FIELDS = ['alert_low','alert_high','systolic_low','systolic_high','diastolic_low','diastolic_high',
   'change_threshold','systolic_change_threshold','diastolic_change_threshold'];
@@ -86,6 +87,7 @@ async function createFamily({db, uid, body, nowMs = Date.now(), oa = null, requi
   const existing = await currentMembership(db, uid);
   if (existing) return {ok: true, ...(await memberStatus({db, uid}))};   // 同一帳號重送：回傳目前狀態
   const profile = parseProfile(body);
+  const medList = parseBatch(body.medications);   // 先驗證，不合格就不建立任何資料
   if (requireFriend && oa && !(await oa.isFriend(uid))) throw fail('FORBIDDEN', '請先加入官方帳號為好友，才能完成綁定');
   const request = /^[0-9a-f-]{36}$/i.test(text(body.requestId)) ? text(body.requestId) : randomBytes(16).toString('hex');
   const key = sha256(uid + ':' + request);
@@ -109,6 +111,7 @@ async function createFamily({db, uid, body, nowMs = Date.now(), oa = null, requi
     return {family_id: familyId, metric_key: metric, enabled: true, metric_name: defByKey.get(metric).metric_name,
       unit: defByKey.get(metric).unit, updated_by: uid, updated_at: new Date(nowMs).toISOString(), ...out};
   }), 'family_id,metric_key');
+  await insertMedications({db, familyId, uid, list: medList, nowMs});
   return {ok: true, bound: true, familyId, role: 'admin', patientId, patientName: profile.patient_name};
 }
 

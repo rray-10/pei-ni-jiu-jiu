@@ -147,10 +147,11 @@ test('已綁定時，頁面資料與會員狀態同時請求，且只請求一�
       await page.setContent(render(name,{LIFF_ENDPOINT:'https://hub.example.test/',LIFF_ID:'fixture'})
         .replace('<head>', () => '<head><script>' + fake.replace(/<\/script/g,'<\\/script') + '</script>'));
       await page.waitForFunction(() => window.release);
-      assert.deepEqual(await page.evaluate(() => window.actions), [action,'memberStatus'], name);
+      const seen = () => page.evaluate(() => window.actions.filter(a => a !== 'medicationList')); // 設定頁另外載入藥物清單
+      assert.deepEqual(await seen(), [action,'memberStatus'], name);
       await page.evaluate(() => window.release());
       await page.locator(ready).waitFor();
-      assert.deepEqual(await page.evaluate(() => window.actions), [action,'memberStatus'], name + ' must not request twice');
+      assert.deepEqual(await seen(), [action,'memberStatus'], name + ' must not request twice');
       await page.close();
     }
   } finally { await browser.close(); }

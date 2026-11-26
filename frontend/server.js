@@ -19,7 +19,7 @@ function render(page, env) {
   const base = https(env.LIFF_ENDPOINT);
   page = ['daily','settings','summary','member','appointments','bind'].includes(page) ? page : 'dashboard';
   const portal = ['member','appointments','bind'].includes(page);
-  const titles = {bind:'綁定家庭',member:'會員中心',appointments:'回診管理',dashboard:'健康摘要',summary:'就診摘要',daily:'健康紀錄',settings:'追蹤設定'};
+  const titles = {bind:'綁定家庭',member:'會員中心',appointments:'回診管理',dashboard:'健康摘要',summary:'就診摘要',daily:'每日紀錄',settings:'追蹤設定'};
   const titled = markup => markup.replace(/<title>[^<]*<\/title>/,'').replace('</head>','<title>陪你久久｜' + titles[page] + '</title></head>');
   const member = readFileSync(path.join(__dirname,'member.html'),'utf8');
   const controller = readFileSync(path.join(__dirname,'member.js'),'utf8');
@@ -95,7 +95,8 @@ const WEB_PATHS = new Set(['/api/member', '/api/daily', '/api/dashboard']);
 // 網頁動作 → Supabase 版路徑（沒有列出的動作留在 GAS）
 function webToV2(pathname, action) {
   if (pathname === '/api/member') return '/api/v2/member';
-  if (pathname === '/api/daily') return {read:'/api/v2/daily/read', record:'/api/v2/daily/record', update:'/api/v2/daily/update'}[action] || null;
+  if (pathname === '/api/daily') return {read:'/api/v2/daily/read', record:'/api/v2/daily/record', update:'/api/v2/daily/update',
+    medicationList:'/api/v2/medication/list', medicationSave:'/api/v2/medication/save', medicationDisable:'/api/v2/medication/disable'}[action] || null;
   if (pathname === '/api/dashboard') return {getHubData:'/api/v2/dashboard/hub', getDashboardData:'/api/v2/dashboard', generateVisitPdf:'/api/v2/dashboard/pdf'}[action] || null;
   return null;
 }

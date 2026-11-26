@@ -137,6 +137,23 @@
      <label>血糖下限<input type="number" min="0" max="1000" name="t:blood_glucose:alertLow"></label>
      <label>血糖上限<input type="number" min="0" max="1000" name="t:blood_glucose:alertHigh"></label>
     </details>
+    <p class="group">用藥（選填，可在追蹤設定修改）</p>
+    <div id="medAdd">
+     <div id="medChips"></div>
+     <button type="button" id="medOpen" class="secondary">＋ 新增藥物</button>
+     <div id="medForm" hidden>
+      <label>藥名<input id="medName" maxlength="60" autocomplete="off"></label>
+      <fieldset id="medSlotsWrap" hidden>
+       <legend>服用時段</legend>
+       <label class="opt"><input type="checkbox" class="medSlot" value="早餐後">早餐後</label>
+       <label class="opt"><input type="checkbox" class="medSlot" value="午餐後">午餐後</label>
+       <label class="opt"><input type="checkbox" class="medSlot" value="晚餐後">晚餐後</label>
+       <label class="opt"><input type="checkbox" class="medSlot" value="睡前">睡前</label>
+      </fieldset>
+      <button type="button" id="medSave" class="secondary" hidden>加入這個藥物</button>
+      <button type="button" id="medCancelAdd" class="secondary">取消</button>
+     </div>
+    </div>
     <button>確認建立</button>
     <button type="button" id="backStep1" class="secondary">上一步</button>
    </fieldset>

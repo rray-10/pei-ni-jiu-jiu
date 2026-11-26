@@ -29,7 +29,9 @@ async function readSettings({db, uid}) {
     return item;
   });
   const settings = Object.fromEntries(defs.map(d => [d.metric_key, latest.get(d.metric_key)?.enabled === true]));
-  return {ok: true, familyId: me.family_id, role: me.role, patientId: link ? link.patient_id : '', metrics, settings};
+  const [fam] = await db.select('families', {select: 'patient_name', family_id: 'eq.' + me.family_id, limit: '1'});
+  return {ok: true, familyId: me.family_id, role: me.role, patientId: link ? link.patient_id : '',
+    patientName: fam ? fam.patient_name : '', metrics, settings};
 }
 
 // 只有管理者能儲存；每個項目都必須是目前有效的定義

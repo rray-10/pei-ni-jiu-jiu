@@ -313,6 +313,33 @@ window.hubSession = (async () => {
         status('請選擇要追蹤的項目。');
       };
       let pending;
+      // 用藥（選填）：藥名 → 服用時段，不填就不送出
+      const medications = [];
+      const medShowSave = () => { const slots = [...document.querySelectorAll('.medSlot')].some(c => c.checked);
+        $('medSlotsWrap').hidden = !$('medName').value.trim(); $('medSave').hidden = !($('medName').value.trim() && slots); };
+      const medRender = () => {
+        $('medChips').replaceChildren(...medications.map((m, i) => {
+          const chip = document.createElement('div');
+          chip.className = 'opt';
+          chip.textContent = m.name + '（' + m.slots.join('、') + '）';
+          const x = document.createElement('button');
+          x.type = 'button'; x.className = 'secondary'; x.textContent = '移除'; x.style.minHeight = '40px';
+          x.onclick = () => { medications.splice(i, 1); medRender(); };
+          chip.append(x);
+          return chip;
+        }));
+      };
+      const medReset = () => { $('medName').value = ''; document.querySelectorAll('.medSlot').forEach(c => { c.checked = false; }); $('medForm').hidden = true; $('medOpen').hidden = false; medShowSave(); };
+      $('medOpen').onclick = () => { $('medForm').hidden = false; $('medOpen').hidden = true; $('medName').focus(); };
+      $('medCancelAdd').onclick = medReset;
+      $('medName').addEventListener('input', medShowSave);
+      document.querySelectorAll('.medSlot').forEach(c => c.addEventListener('change', medShowSave));
+      $('medSave').onclick = () => {
+        const name = $('medName').value.trim();
+        const slots = [...document.querySelectorAll('.medSlot')].filter(c => c.checked).map(c => c.value);
+        if (!name || !slots.length || medications.length >= 10) return;
+        medications.push({name, slots}); medRender(); medReset();
+      };
       $('startFamily').onsubmit = event => {
         event.preventDefault();
         if (!$('startStep2').hidden) {
@@ -334,7 +361,7 @@ window.hubSession = (async () => {
           // 同一份內容重送沿用同一個 requestId；內容改了就是另一次建立
           const signature = JSON.stringify(fields);
           if (pending?.signature !== signature) pending = {signature,requestId:crypto.randomUUID?.()}; // 舊版瀏覽器沒有時由後端產生
-          return complete('createFamily',{...fields,requestId:pending.requestId});
+          return complete('createFamily',{...fields,medications,requestId:pending.requestId});
         }
         $('toStep2').click();
       };

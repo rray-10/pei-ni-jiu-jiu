@@ -9,6 +9,7 @@ const {renderVisitPdf} = require('./pdf.js');
 const {writeDaily} = require('./daily.js');
 const membership = require('./membership.js');
 const settings = require('./settings.js');
+const medications = require('./medications.js');
 
 // 這些動作會改變「誰已綁定」，之後要同步 Rich Menu
 const MENU_ACTIONS = new Set(['createFamily', 'joinFamily', 'unbind', 'deleteFamily', 'restoreFamily', 'switchFamily', 'removeMember']);
@@ -79,6 +80,9 @@ function createV2({url, serviceKey, channelId, fetcher = fetch, oaToken = '', bo
       if (path === '/api/v2/daily/record') return {status: 200, body: await writeDaily({db, lineUid, body})};
       if (path === '/api/v2/daily/read') return {status: 200, body: await settings.readSettings({db, uid: lineUid})};
       if (path === '/api/v2/daily/update') return {status: 200, body: await settings.updateSettings({db, uid: lineUid, body})};
+      if (path === '/api/v2/medication/list') return {status: 200, body: await medications.listMedications({db, uid: lineUid})};
+      if (path === '/api/v2/medication/save') return {status: 200, body: await medications.saveMedication({db, uid: lineUid, body})};
+      if (path === '/api/v2/medication/disable') return {status: 200, body: await medications.disableMedication({db, uid: lineUid, body})};
       if (path === '/api/v2/dashboard/pdf') {
         const days = Number(body.days || 7);
         if (![7, 30, 90].includes(days)) return {status: 400, body: {ok: false, error: '期間無效'}};

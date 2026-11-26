@@ -48,6 +48,7 @@ test('with USE_V2_WEB=true the daily read goes to Supabase, not GAS', async () =
   assert.equal(out.body.metrics[0].metricKey, 'blood_pressure');
   assert.equal(out.body.metrics[0].systolicHigh, 140);
   assert.equal(out.body.settings.blood_pressure, true);
+  assert.equal(out.body.patientName, '阿嬤');   // settings page shows the name, not the family id
   assert.equal(world.gasCalls.length, 0);
 });
 
@@ -98,4 +99,15 @@ test('/api/status says which backend is serving', async () => {
   const gas = await get(env());
   assert.equal(gas.backend, 'gas');
   assert.equal(gas.commit, 'local');
+});
+
+test('targets need both ends of a range; the band is only drawn when complete', () => {
+  const {targetsFrom} = require('../backend/dashboard.js');
+  const t = targetsFrom([
+    {metric_key:'blood_pressure', systolic_low:100, systolic_high:140, diastolic_low:60, diastolic_high:null},
+    {metric_key:'blood_glucose', alert_low:70, alert_high:140}
+  ]);
+  assert.deepEqual(t.systolic, {low:100, high:140});
+  assert.equal(t.diastolic, null);
+  assert.deepEqual(t.glucose, {low:70, high:140});
 });
