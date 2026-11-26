@@ -110,6 +110,11 @@ function createServer(env = process.env, fetcher = fetch) {
     '/api/dashboard': https(env.DASHBOARD_GAS_URL),
     '/line/events': https(env.LINE_MAIN_WEBHOOK_URL)
   };
+  // Supabase 版 API（/api/v2/*）：只有設定 SUPABASE_URL 才啟用，和 GAS 並行，尚未切換。
+  const v2 = env.SUPABASE_URL && env.SUPABASE_SERVICE_KEY
+    ? require('../backend/v2.js').createV2({url: env.SUPABASE_URL, serviceKey: env.SUPABASE_SERVICE_KEY,
+        channelId: env.LINE_LOGIN_CHANNEL_ID, fetcher})
+    : null;
   return http.createServer(async (req, res) => {
     const send = (status, type, data) => {
       res.writeHead(status, {'Content-Type':type,'Cache-Control':'no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY'});
@@ -129,6 +134,14 @@ function createServer(env = process.env, fetcher = fetch) {
         res.writeHead(200, {'Content-Type':'application/pdf','Content-Length':item.bytes.length,'Cache-Control':'no-store',
           'Content-Disposition':"attachment; filename*=UTF-8''" + encodeURIComponent(item.filename),'X-Content-Type-Options':'nosniff'});
         return res.end(item.bytes);
+      }
+      if (req.method === 'POST' && url.pathname.startsWith('/api/v2/')) {
+        if (!v2) return json(503, {ok:false,error:'[CONFIG] 尚未設定 Supabase'});
+        if (req.headers.origin !== new URL(endpoint).origin) return json(403, {ok:false});
+        let body;
+        try { body = JSON.parse((await readBody(req)).toString('utf8') || '{}'); } catch { return json(400, {ok:false,error:'格式錯誤'}); }
+        const out = await v2(url.pathname, body);
+        return json(out.status, out.body);
       }
       if (req.method !== 'POST' || !Object.hasOwn(upstreams, url.pathname)) return json(404, {ok:false});
       const upstream = upstreams[url.pathname];

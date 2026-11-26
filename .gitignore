@@ -25,3 +25,6 @@ coverage/
 
 # n8n import copies with real IDs filled in
 n8n/import/
+
+# 本機用文件（組員清單、遷移筆記），不推到 GitHub
+n8n/_local/
