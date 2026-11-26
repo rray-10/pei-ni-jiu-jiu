@@ -96,7 +96,7 @@ const WEB_PATHS = new Set(['/api/member', '/api/daily', '/api/dashboard']);
 function webToV2(pathname, action) {
   if (pathname === '/api/member') return '/api/v2/member';
   if (pathname === '/api/daily') return {read:'/api/v2/daily/read', record:'/api/v2/daily/record', update:'/api/v2/daily/update'}[action] || null;
-  if (pathname === '/api/dashboard') return {getHubData:'/api/v2/dashboard/hub', getDashboardData:'/api/v2/dashboard'}[action] || null;
+  if (pathname === '/api/dashboard') return {getHubData:'/api/v2/dashboard/hub', getDashboardData:'/api/v2/dashboard', generateVisitPdf:'/api/v2/dashboard/pdf'}[action] || null;
   return null;
 }
 
@@ -171,6 +171,11 @@ function createServer(env = process.env, fetcher = fetch) {
         const target = webToV2(url.pathname, parsed.action);
         if (target) {
           const out = await v2(target, parsed);
+          // PDF 與 GAS 相同：產生後放到 /pdf/<id> 給 LINE 內建瀏覽器下載
+          if (target === '/api/v2/dashboard/pdf' && out.body.ok) {
+            const id = storePdf(String(out.body.data.filename || 'summary.pdf'), Buffer.from(out.body.data.base64, 'base64'));
+            return json(out.status, {ok:true, data:{filename:out.body.data.filename, url:new URL('/pdf/' + id, endpoint).href}});
+          }
           return json(out.status, out.body);
         }
       }

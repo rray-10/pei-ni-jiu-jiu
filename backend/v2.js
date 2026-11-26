@@ -4,7 +4,8 @@ const {timingSafeEqual} = require('node:crypto');
 const {createSupabase} = require('./supabase-client.js');
 const {createLineAuth} = require('./line-auth.js');
 const {createLineOa} = require('./line-oa.js');
-const {loadDashboard} = require('./dashboard.js');
+const {loadDashboard, loadVisitSummary} = require('./dashboard.js');
+const {renderVisitPdf} = require('./pdf.js');
 const {writeDaily} = require('./daily.js');
 const membership = require('./membership.js');
 const settings = require('./settings.js');
@@ -78,6 +79,14 @@ function createV2({url, serviceKey, channelId, fetcher = fetch, oaToken = '', bo
       if (path === '/api/v2/daily/record') return {status: 200, body: await writeDaily({db, lineUid, body})};
       if (path === '/api/v2/daily/read') return {status: 200, body: await settings.readSettings({db, uid: lineUid})};
       if (path === '/api/v2/daily/update') return {status: 200, body: await settings.updateSettings({db, uid: lineUid, body})};
+      if (path === '/api/v2/dashboard/pdf') {
+        const days = Number(body.days || 7);
+        if (![7, 30, 90].includes(days)) return {status: 400, body: {ok: false, error: '期間無效'}};
+        const summary = await loadVisitSummary({db, lineUid, days});
+        const bytes = await renderVisitPdf(summary);
+        return {status: 200, body: {ok: true, data: {filename: `健康摘要_${summary.patient.id}_${days}天.pdf`,
+          base64: bytes.toString('base64')}}};
+      }
       if (path === '/api/v2/dashboard/hub') {
         // 與 GAS getHubData 相同的形狀：{context, dashboard, meta}
         const days = Number(body.days || 7);

@@ -5,7 +5,7 @@ services:
     runtime: node
     plan: free
     branch: integration/f1-live
-    buildCommand: echo "no build step"
+    buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /?page=bind
     envVars:

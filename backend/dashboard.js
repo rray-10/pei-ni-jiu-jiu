@@ -16,8 +16,8 @@ function legacyRecord(row) {
   };
 }
 
-// 讀取一個家庭的儀表板所需資料；lineUid 必須先通過 members 查核
-async function loadDashboard({db, lineUid, days, nowMs = Date.now()}) {
+// 組出儀表板需要的資料（只含登入者自己的家庭）；lineUid 必須先通過 members 查核
+async function buildSource({db, lineUid, days, nowMs = Date.now()}) {
   const mine = await db.select('members', {select: 'family_id', line_uid: 'eq.' + lineUid, limit: '1'});
   if (!mine[0]) throw Object.assign(new Error('[NOT_MEMBER] 尚未加入照護家庭'), {code: 'NOT_MEMBER'});
   const familyId = mine[0].family_id;
@@ -44,8 +44,18 @@ async function loadDashboard({db, lineUid, days, nowMs = Date.now()}) {
     appointments: appts.map(a => ({appt_id: a.appt_id, patient_id: a.patient_id, date: a.date, session: a.session || '',
       hospital: a.hospital || '', department: a.department || '', status: a.status}))
   };
-  const nowIso = new Date(nowMs).toISOString();
-  return DashboardService.getDashboardData(src, lineUid, null, days, nowIso);
+  return {src, nowIso: new Date(nowMs).toISOString()};
 }
 
-module.exports = {loadDashboard, legacyRecord, taipeiToday};
+async function loadDashboard(args) {
+  const {src, nowIso} = await buildSource(args);
+  return DashboardService.getDashboardData(src, args.lineUid, null, args.days, nowIso);
+}
+
+// 就診摘要：與 GAS getVisitSummary 相同（含最高／最低）
+async function loadVisitSummary(args) {
+  const {src, nowIso} = await buildSource(args);
+  return DashboardService.getVisitSummary(src, args.lineUid, null, args.days, nowIso);
+}
+
+module.exports = {loadDashboard, loadVisitSummary, legacyRecord, taipeiToday};
