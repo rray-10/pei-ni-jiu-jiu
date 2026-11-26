@@ -25,40 +25,6 @@ window.hubSession = (async () => {
     $('modalExtra').onclick = () => close('extra');
     $('modalCancel').onclick = () => close(false);
   });
-  /** 選擇新的管理者，回傳成員的 key 或 null。 */
-  const pickMember = members => new Promise(resolve => {
-    $('modalTitle').textContent = '指定新的管理者';
-    $('modalText').textContent = '選擇要接手的成員。對方會成為管理者，之後你就可以離開。';
-    $('modalOk').hidden = true;
-    $('modalExtra').hidden = true;
-    const list = document.createElement('div');
-    $('modalOptions').replaceChildren(...members.map(member => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'secondary';
-      button.textContent = member.displayName || '成員';
-      button.onclick = () => done(member.key);
-      return button;
-    }));
-    $('modalOptions').append(list);
-    $('modal').hidden = false;
-    const done = value => {
-      $('modal').hidden = true;
-      $('modalOptions').replaceChildren();
-      $('modalOk').hidden = false;
-      resolve(value);
-    };
-    $('modalCancel').onclick = () => done(null);
-  });
-  /** 管理者離開且沒有其他管理者時，決定要刪除家庭或指定新管理者。回傳要送出的額外欄位，取消則回傳 null。 */
-  const chooseLeave = async others => {
-    const choice = await confirmBox({title:'離開前請選擇', danger:true, ok:'刪除家庭', extra:'指定新管理者',
-      text:'你是目前唯一的管理者，家裡還有其他成員。\n・刪除家庭：所有人一起解除綁定，3 個月內可復原\n・指定新管理者：由對方接手，你再離開'});
-    if (choice === 'ok') return {deleteFamily:true};
-    if (choice !== 'extra') return null;
-    const key = await pickMember(others);
-    return key ? {promoteMemberKey:key} : null;
-  };
   const day = iso => new Date(iso).toLocaleDateString('zh-TW',{timeZone:'Asia/Taipei'});
   const icon = name => '<svg class="ico" aria-hidden="true"><use href="#i-' + name + '"></use></svg>';
   const linkIcons = {'健康摘要':'chart','每日紀錄':'edit','會員中心':'people'};
@@ -88,7 +54,7 @@ window.hubSession = (async () => {
       $('familyRole').append(data.role === 'admin' ? '家庭管理者' : '家人');
       $('invite').hidden = data.role !== 'admin';
       $('inviteCard').hidden = data.role !== 'admin';
-      $('unbindLabel').textContent = data.role === 'admin' ? '離開照護家庭' : '解除綁定';
+      $('unbindLabel').textContent = data.role === 'admin' ? '刪除照護家庭' : '解除綁定';
       $('memberLinks').replaceChildren(...Object.entries(cfg.links)
         .filter(([label,url]) => url && label !== '回到 LINE 官方帳號' && !(['member','bind'].includes(cfg.page) && label === '會員中心'))
         .map(([label,url]) => {
@@ -209,23 +175,19 @@ window.hubSession = (async () => {
         const {members} = await api('listMembers');
         const self = members.find(member => member.isSelf);
         const others = members.filter(member => !member.isSelf);
-        const isAdmin = self?.role === 'admin';
-        let extra = {};
-        if (isAdmin && others.length && !others.some(member => member.role === 'admin')) {
-          extra = await chooseLeave(others);
-          if (!extra) return;
-        } else if (isAdmin && !others.length) {
+        if (self?.role === 'admin') {
           if (!await confirmBox({title:'刪除照護家庭？',ok:'確認刪除',
-            text:'「' + name + '」照護家庭將被刪除。\n三個月內可以復原家庭。'})) return;
-        } else if (!await confirmBox({title:'解除綁定？',ok:'確認解除',
-          text:'解除後你將無法查看或記錄「' + name + '」的資料，家庭和紀錄仍會保留給其他家人。\n\n之後可用家人的邀請連結再次加入，或建立自己的照護家庭。'})) {
-          return;
+            text:'「' + name + '」照護家庭將被刪除。' + (others.length ? '\n其他 ' + others.length + ' 位成員也會被解除綁定。' : '') + '\n三個月內可以復原家庭。'})) return;
+          const result = await api('deleteFamily');
+          $('memberHeading').textContent = '照護家庭已刪除';
+          ended('已刪除，' + day(result.restoreUntil) + ' 前可在建立頁面復原。');
+        } else {
+          if (!await confirmBox({title:'解除綁定？',ok:'確認解除',
+            text:'解除後你將無法查看或記錄「' + name + '」的資料，家庭和紀錄仍會保留給其他家人。\n\n之後可用家人的邀請連結再次加入，或建立自己的照護家庭。'})) return;
+          await api('unbind');
+          $('memberHeading').textContent = '已解除綁定';
+          ended('LINE 選單會恢復為未綁定樣式。');
         }
-        const result = await api('unbind', extra);
-        $('memberHeading').textContent = result.deleted ? '照護家庭已刪除' : '已解除綁定';
-        ended(result.deleted
-          ? '已刪除，' + day(result.restoreUntil) + ' 前可在建立頁面復原。'
-          : 'LINE 選單會恢復為未綁定樣式。');
       } catch (err) { status(err.message,'error'); }
       finally { $('unbind').disabled = false; }
     };
@@ -244,7 +206,7 @@ window.hubSession = (async () => {
         $('memberHeading').textContent = '切換照護家庭';
         $('switchText').textContent = '你目前綁定「' + peek.current.patientName + '」的家庭（' + (peek.current.role === 'admin' ? '管理者' : '成員') +
           '）。邀請你加入的是「' + peek.preview.patientName + '」的家庭。一個帳號目前只能綁定一個家庭。';
-        $('switchBlock').textContent = peek.needsChoice ? '你是目前家庭的管理者，離開前需要選擇：刪除家庭，或指定新的管理者。'
+        $('switchBlock').textContent = peek.needsChoice ? '你是目前家庭的管理者，加入新家庭前要先刪除目前的照護家庭。'
           : peek.lastMember ? '你是目前家庭最後一位成員，離開後該家庭會被刪除（3 個月內可復原）。' : '';
         $('doSwitch').textContent = '解除目前綁定並加入';
         $('switchPanel').hidden = false;
@@ -256,9 +218,9 @@ window.hubSession = (async () => {
             try {
               let extra = {};
               if (peek.needsChoice) {
-                const {members} = await api('listMembers');
-                extra = await chooseLeave(members.filter(member => !member.isSelf));
-                if (!extra) { $('doSwitch').disabled = false; return; }
+                if (!await confirmBox({title:'刪除目前的照護家庭？',ok:'確認刪除並加入',
+                  text:'你是目前家庭的管理者，加入新家庭前要先刪除目前的照護家庭（三個月內可以復原）。'})) { $('doSwitch').disabled = false; return; }
+                extra = {deleteFamily:true};
               }
               const result = await api('switchFamily',{inviteCode:invited,...extra});
               $('switchPanel').hidden = true;
@@ -296,8 +258,9 @@ window.hubSession = (async () => {
         try {
           const result = await api(action,fields);
           if (result.pending) {
-            status('請加入官方帳號好友，加入後會自動完成綁定。');
+            status('請加入官方帳號好友，加入後會自動完成綁定。','error'); // 紅字，並會自動顯示加好友按鈕
             $('addFriend').hidden = false;
+            $('memberStatus').scrollIntoView({block:'center'}); // 提示在頁面上方，要捲過去才看得到
             return;
           }
           if (cfg.module && result.menu === 'retry') {
@@ -385,7 +348,7 @@ window.hubSession = (async () => {
           $('joinPreview').textContent = '要加入「' + result.preview.patientName + '」的照護家庭嗎？';
           step('joinFamily','joinStep2');
           status('請確認家庭名稱。');
-        } catch (err) { status(err.message,'error'); }
+        } catch (err) { status(err.message,'error'); $('memberStatus').scrollIntoView({block:'center'}); }
         finally { disable(false); }
       };
       if (validInvite) {

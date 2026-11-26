@@ -51,7 +51,8 @@ function f1Activate_(body) {
     } finally {
       lock.releaseLock();
     }
-    if (out.activated) out.menu = syncMemberMenu_(uid,props);
+    // 已綁定的人（例如封鎖後重新加好友）也要重新套用已綁定選單：LINE 在封鎖或取消好友時會清掉個人選單
+    if (out.activated || out.reason === 'bound') out.menu = syncMemberMenu_(uid,props);
     return {ok:true,...out};
   } catch (err) {
     return {ok:false,error:'服務暫時無法完成'};
