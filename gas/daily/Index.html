@@ -60,8 +60,6 @@
       const pair=document.createElement("div");pair.className="pair";
       [["systolic","收縮壓"],["diastolic","舒張壓"]].forEach(([key,txt])=>{const i=document.createElement("input");i.className="control";i.type="number";i.min="1";i.max="300";i.placeholder=txt;i.setAttribute("aria-label",txt);i.dataset.metric=m.metricKey;i.dataset.part=key;pair.append(i);});
       box.append(pair);const alert=document.createElement("p");alert.className="alert hidden";alert.dataset.alert=m.metricKey;box.append(alert);const update=()=>{const hits=[];[["收縮壓","systolic"],["舒張壓","diastolic"]].forEach(([label,key])=>{const input=pair.querySelector(`[data-part=${key}]`),value=Number(input.value),low=m[`${key}Low`],high=m[`${key}High`];if(input.value!==""&&low!=null&&value<Number(low))hits.push(`${label} ${value} 低於 ${low}`);if(input.value!==""&&high!=null&&value>Number(high))hits.push(`${label} ${value} 高於 ${high}`);});alert.textContent=hits.length?`超出設定標準：${hits.join("；")} mmHg。單次讀值僅供提醒，請依個人醫囑判讀。`:"";alert.className=`alert ${hits.length?"warn":"hidden"}`;};pair.querySelectorAll("input").forEach(i=>i.addEventListener("input",update));
-    } else if (m.inputType === "boolean" && m.metricKey === "medication") {
-      const row=document.createElement("label");row.className="check";const i=document.createElement("input");i.type="checkbox";i.dataset.metric=m.metricKey;row.append(i,document.createTextNode("這個時段已用藥"));box.append(row);
     } else if (m.inputType === "boolean") {
       const row=document.createElement("label");row.className="check";const i=document.createElement("input");i.type="checkbox";i.dataset.metric=m.metricKey;row.append(i,document.createTextNode("今天已完成"));box.append(row);
     } else {
@@ -87,13 +85,10 @@
       const values={};
       metrics.filter(m=>m.isActive&&enabledKeys.has(m.metricKey)).forEach(m=>{
         if(m.inputType==="bloodPressure") {const a=$("recordFields").querySelector(`[data-metric="${m.metricKey}"][data-part="systolic"]`).value;const b=$("recordFields").querySelector(`[data-metric="${m.metricKey}"][data-part="diastolic"]`).value;if(a!==""&&b!=="")values[m.metricKey]=`${a}/${b}`;}
-        else if(m.inputType==="boolean"&&m.metricKey==="medication"){const i=$("recordFields").querySelector(`[data-metric="${m.metricKey}"]`);values[m.metricKey]=i.checked;}
         else if(m.inputType==="boolean"){const i=$("recordFields").querySelector(`[data-metric="${m.metricKey}"][type="checkbox"]`);if(i.checked)values[m.metricKey]=true;}
         else {const i=$("recordFields").querySelector(`[data-metric="${m.metricKey}"]`);if(i.value!=="")values[m.metricKey]=Number(i.value);}
       });
       if(!$('recordDate').value)throw new Error("請選擇紀錄日期。");
-      const medication=metrics.find(m=>m.metricKey==="medication"&&m.inputType==="boolean"&&enabledKeys.has(m.metricKey));
-      if(medication){const label=medPeriods.find(([key])=>key===selectedPeriod)?.[1]||"目前";if(!window.confirm(`要記錄「${label}」時段的用藥狀態嗎？\n按「確定」表示已用藥；按「取消」表示尚未用藥。`))values.medication=false;else values.medication=true;}
       if(!Object.keys(values).length)throw new Error("請至少填寫一個項目。");
       const submission={values,recordDate:$("recordDate").value,period:selectedPeriod,note:$("note").value};
       const signature=JSON.stringify(submission);
