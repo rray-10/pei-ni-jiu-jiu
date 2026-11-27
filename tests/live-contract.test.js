@@ -51,7 +51,7 @@ test('gateway validates exact signed bytes and forwards unchanged LINE event', a
 });
 
 // Minimal Luxon stand-in: "today" is 2026-12-03 and every parsed date is 2026-12-04.
-const day = iso => ({isValid:true,weekday:5,hour:10,toISODate:() => iso,toFormat:format => format === 'HH:mm' ? '10:00' : '12/4',
+const day = iso => ({isValid:true,weekday:5,hour:10,toISODate:() => iso,toISO:() => iso + 'T10:00:00+08:00',toFormat:format => format === 'HH:mm' ? '10:00' : '12/4',
   setZone() { return this; },startOf() { return this; },diff:() => ({days:1})});
 const clock = {fromISO:value => day(value || '2026-12-04'),now:() => day('2026-12-03')};
 function runNode(name,tables) {
@@ -64,21 +64,23 @@ function runNode(name,tables) {
 test('appointment flow writes a draft only for a bound family and keeps postback datetime params', () => {
   const event = {type:'postback',postback:{data:'action=appt_datetime&id=new',params:{datetime:'2026-12-04T13:00'}},
     source:{userId:'fixture-line'},replyToken:'fixture-reply'};
-  const tables = {'Get row(s) in sheet':[{lineUid:'fixture-line',familyId:'fixture-family'}],'查詢回診進行中':[],'解析事件':[{event}]};
+  const tables = {'Get row(s) in sheet':[{line_uid:'fixture-line',family_id:'fixture-family'}],
+    '查 family_patients':[{family_id:'fixture-family',patient_id:'P_FIXTURE'}],'查詢回診進行中':[],'解析事件':[{event}]};
   const [write, reply] = runNode('決定動作',tables);
-  assert.equal(write.row.patient_id,'fixture-family');
+  assert.equal(write.row.patient_id,'P_FIXTURE');
   assert.deepEqual([write.row.date,write.row.session,write.row.status],['2026-12-04','13:00','draft']);
   assert.equal(reply.replyToken,'fixture-reply');
-  tables['Get row(s) in sheet'] = [];
+  tables['Get row(s) in sheet'] = [];   // 不是家庭成員：不寫入
   assert.equal(runNode('決定動作',tables).some(item => item.kind === 'write'),false);
 });
 
 test('appointment reminder reaches only that family and skips a push already sent', () => {
   const tables = {
     '提醒設定':[{MODE:'morning'}],
-    '提醒｜讀取 appointments':[{appt_id:'fake-appointment',patient_id:'F_TEST',date:'2026-12-04',status:'scheduled'}],
-    '提醒｜讀取 users':[{familyId:'F_TEST',lineUid:'line-family'},{familyId:'F_OTHER',lineUid:'line-other'}],
-    '提醒｜讀取 patients':[{familyId:'F_TEST',patientName:'虛構家人'}],
+    '提醒｜讀取 appointments':[{appt_id:'fake-appointment',patient_id:'P_TEST',date:'2026-12-04',status:'scheduled'}],
+    '提醒｜讀取 users':[{family_id:'F_TEST',line_uid:'line-family'},{family_id:'F_OTHER',line_uid:'line-other'}],
+    '提醒｜讀取 patients':[{family_id:'F_TEST',patient_name:'虛構家人'}],
+    '提醒｜讀取 family_patients':[{family_id:'F_TEST',patient_id:'P_TEST'}],
     '提醒｜讀取 notification_log':[]
   };
   const pushes = runNode('組合推播',tables);
