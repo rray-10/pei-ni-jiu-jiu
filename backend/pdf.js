@@ -57,8 +57,8 @@ function renderVisitPdf(d) {
     });
     doc.moveDown(0.4);
     doc.x = LEFT;
-    line(`用藥回報：${d.medication.taken} / ${d.medication.total} 次（${dash(d.medication.rate)}%）`);
-    line('注意：用藥回報不等於實際服藥。');
+    line(`用藥紀錄：${d.medication.total ? `${d.medication.taken} / ${d.medication.total} 次（${dash(d.medication.rate)}%）` : '未設定藥物'}`);
+    line('注意：用藥紀錄以打卡為準，不代表實際服藥。');
 
     heading('目前登錄藥物');
     if (d.medications && d.medications.length) {
@@ -72,7 +72,7 @@ function renderVisitPdf(d) {
     else line('尚無問題');
 
     doc.moveDown(1).fontSize(9).fillColor('#777777')
-      .text('此摘要依使用者自行輸入的紀錄產生，僅供就診參考，不代表醫療診斷。用藥回報不等於實際服藥。', LEFT, doc.y, {width: WIDTH});
+      .text('此摘要依使用者自行輸入的紀錄產生，僅供就診參考，不代表醫療診斷。用藥紀錄以打卡為準，不代表實際服藥。', LEFT, doc.y, {width: WIDTH});
     doc.end();
   });
 }
