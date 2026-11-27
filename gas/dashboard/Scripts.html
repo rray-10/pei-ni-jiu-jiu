@@ -38,6 +38,7 @@ else if(state.metric==='glucose'){$('chartTitle').textContent='血糖'+(showTabl
 else{const m=d.medication;
   if(showTable){$('chartTitle').textContent='用藥詳細';
     const mark={taken:'✓ 已吃',cancelled:'取消',none:'—'};
+    if(!m.allSlots||!m.rows){$('chart').innerHTML='<div class="center">這個版本尚未提供用藥明細，請重新整理頁面；仍無法顯示時請通知管理者。</div>';$('chartNote').textContent='';return;}
     $('chart').innerHTML=table(['日期',...m.allSlots],m.rows.map(r=>[date(r.date),...r.slots.map(x=>(x.status==='taken'&&!x.counted)?'✓（未計入）':mark[x.status])]));
     $('chartNote').textContent='✓ 已吃；— 未打卡（今天還沒到的時段也會先顯示為 —）；取消 為取消打卡。沒有設定藥物的時段不計入比例。';}
   else{$('chartTitle').textContent='用藥紀錄';
