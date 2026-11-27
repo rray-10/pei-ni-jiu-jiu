@@ -2,6 +2,31 @@
 window.hubSession = (async () => {
   const cfg = window.MEMBER_CONFIG;
   const $ = id => document.getElementById(id);
+  // 欄位錯誤：紅框＋輸入框下方紅字，輸入時自動清除
+  const fieldError = (input, text) => {
+    clearFieldErrors(input.form);
+    input.classList.add('invalid');
+    const anchor = input.closest('label') || input;
+    if (anchor.nextElementSibling?.classList.contains('field-error')) anchor.nextElementSibling.remove();
+    const note = document.createElement('p'); note.className = 'field-error'; note.textContent = text;
+    anchor.insertAdjacentElement('afterend', note);
+    input.focus();
+    input.addEventListener?.('input', () => clearFieldErrors(input.form), {once: true});
+  };
+  // 依錯誤內容找到對應欄位；欄位不可見時（例如第二步）改顯示在該步驟的可見位置
+  const showError = (form, err, fallback) => {
+    const rules = [[/邀請碼/, 'inviteCode'], [/出生年/, 'birthYear'], [/稱呼/, 'patientName'], [/同意/, 'consent'], [/追蹤項目/, 'metric']];
+    const hit = rules.find(([re]) => re.test(err.message));
+    const input = hit && form && form.querySelector(`[name="${hit[1]}"]`);
+    if (input && input.offsetParent !== null) return fieldError(input, err.message);
+    if (fallback && fallback.offsetParent !== null) return fieldError(fallback, err.message);
+    status(err.message, 'error');
+  };
+  const clearFieldErrors = form => {
+    if (!form) return;
+    form.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
+    form.querySelectorAll('.field-error').forEach(el => el.remove());
+  };
   const status = (text, kind = '') => {
     const el = $('memberStatus');
     el.textContent = text;
@@ -275,7 +300,7 @@ window.hubSession = (async () => {
           } else {
             resolve(finish(result));
           }
-        } catch (err) { status(err.message,'error'); }
+        } catch (err) { showError(action === 'joinFamily' ? $('joinFamily') : $('startFamily'), err, action === 'joinFamily' ? $('joinPreview') : null); }
         finally { disable(false); }
       };
       $('restoreList').replaceChildren(...restorable.map(item => {
@@ -308,9 +333,11 @@ window.hubSession = (async () => {
       $('toStep2').onclick = () => {
         const form = $('startFamily');
         const year = form.elements.birthYear.value.trim();
-        if (isProxy(form) && !form.elements.consent.checked) { status('請先勾選「我已取得患者同意」'); return; }
-        if (!form.elements.patientName.value.trim()) { status('請輸入稱呼'); form.elements.patientName.focus(); return; }
-        if (year && !/^\d{4}$/.test(year)) { status('出生年請輸入 4 位數西元年'); return; }
+        if (isProxy(form) && !form.elements.consent.checked) { fieldError(form.elements.consent, '請先勾選「我已取得患者同意」'); return; }
+        clearFieldErrors(form);
+        if (!form.elements.patientName.value.trim()) { fieldError(form.elements.patientName, '請輸入稱呼'); return; }
+        const thisYear = new Date().getFullYear();
+        if (year && (!/^\d{4}$/.test(year) || Number(year) < 1900 || Number(year) > thisYear)) { fieldError(form.elements.birthYear, '出生年請輸入 1900 到今年之間的西元年（例如 1956）'); return; }
         step('startFamily','startStep2');
         status('請選擇要追蹤的項目。');
       };
@@ -347,7 +374,7 @@ window.hubSession = (async () => {
         if (!$('startStep2').hidden) {
           const form = new FormData(event.currentTarget);
           const metrics = form.getAll('metric');
-          if (!metrics.length) { status('請至少選擇一個追蹤項目'); return; }
+          if (!metrics.length) { clearFieldErrors(event.currentTarget); fieldError(event.currentTarget.querySelector('input[name="metric"]'), '請至少選擇一個追蹤項目'); return; }
           const thresholds = {};
           for (const [name, value] of form.entries()) {
             const [kind, metric, field] = name.split(':');
@@ -377,7 +404,7 @@ window.hubSession = (async () => {
           $('joinPreview').textContent = '要加入「' + result.preview.patientName + '」的照護家庭嗎？';
           step('joinFamily','joinStep2');
           status('請確認家庭名稱。');
-        } catch (err) { status(err.message,'error'); $('memberStatus').scrollIntoView({block:'center'}); }
+        } catch (err) { showError($('joinFamily'), err, $('joinFamily').querySelector('[name="inviteCode"]')); }
         finally { disable(false); }
       };
       if (validInvite) {

@@ -55,7 +55,7 @@ function parseProfile(body) {
   if (!name || name.length > 60) throw fail('BAD_REQUEST', '請輸入 1 到 60 字的稱呼');
   if (body.proxy && body.consent !== true) throw fail('BAD_REQUEST', '替家人建立前，請先確認已取得患者同意');
   const year = text(body.birthYear);
-  if (year && (!/^\d{4}$/.test(year) || Number(year) < 1900 || Number(year) > new Date().getFullYear())) throw fail('BAD_REQUEST', '出生年請輸入 4 位數西元年');
+  if (year && (!/^\d{4}$/.test(year) || Number(year) < 1900 || Number(year) > new Date().getFullYear())) throw fail('BAD_REQUEST', '出生年請輸入 1900 到今年之間的西元年（例如 1956）');
   const conditions = (Array.isArray(body.conditions) ? body.conditions : (body.conditions ? [body.conditions] : []))
     .map(text).filter(Boolean);
   if (conditions.length > 10 || conditions.some(c => c.length > 30)) throw fail('BAD_REQUEST', '慢性病內容過長');

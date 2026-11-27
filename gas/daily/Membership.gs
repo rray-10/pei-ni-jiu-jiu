@@ -17,7 +17,7 @@ function memberProfile_(body) {
   const profile = {};
   const year = f1Text_(body.birthYear);
   if (year) {
-    if (!/^\d{4}$/.test(year) || Number(year) < 1900 || Number(year) > new Date().getFullYear()) f1Fail_('出生年請輸入 4 位數西元年');
+    if (!/^\d{4}$/.test(year) || Number(year) < 1900 || Number(year) > new Date().getFullYear()) f1Fail_('出生年請輸入 1900 到今年之間的西元年（例如 1956）');
     profile.birthYear = Number(year);
   }
   const list = Array.isArray(body.conditions) ? body.conditions : (body.conditions ? [body.conditions] : []);
