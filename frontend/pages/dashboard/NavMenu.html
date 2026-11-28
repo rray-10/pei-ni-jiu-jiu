@@ -1,0 +1,11 @@
+  <nav class="sidebar" id="sidebar" aria-label="主選單">
+    <div class="brand"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 41C10 31 5 24 5 17.5 5 12 9 8 14 8c4 0 8 2.5 10 6.5C26 10.5 30 8 34 8c5 0 9 4 9 9.5C43 24 38 31 24 41z" fill="none" stroke="#38775c" stroke-width="3.5" stroke-linejoin="round"/><path d="M13 24h6l3-6 4 11 3-5h6" fill="none" stroke="#e09a55" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>陪你久久<small>照護小幫手</small></span></div>
+    <a id="navDash" href="<?= config.nav.dashboard || '?page=dashboard' ?>" aria-current="page">📊 健康摘要</a>
+    <a id="navDaily" href="<?= config.nav.daily || '#' ?>" class="<?= config.nav.daily ? '' : 'disabled' ?>">📝 每日紀錄</a>
+    <a href="<?= config.nav.settings || '#' ?>" class="<?= config.nav.settings ? '' : 'disabled' ?>">⚙️ 追蹤設定</a>
+    <a href="<?= config.nav.member || '#' ?>" class="<?= config.nav.member ? '' : 'disabled' ?>">👥 會員中心</a>
+    <a id="navSummary" href="<?= config.nav.summary || '#' ?>">📄 就診摘要 PDF</a>
+    <a href="<?= config.nav.medication || '#' ?>" class="<?= config.nav.medication ? '' : 'disabled' ?>">💊 用藥提醒設定</a>
+    <a href="<?= config.nav.appointments || '#' ?>" class="<?= config.nav.appointments ? '' : 'disabled' ?>">📅 回診管理</a>
+  </nav>
+  <div class="scrim" id="scrim"></div>

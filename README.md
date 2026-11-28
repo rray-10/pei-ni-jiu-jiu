@@ -22,12 +22,37 @@ LINE App ── LIFF ──► frontend/server.js (Node 22, 頂層 HTTPS，Rende
 | 路徑 | 用途 |
 | --- | --- |
 | `frontend/` | Node 主機（`server.js`）與綁定／會員頁（`member.html`、`member.js`） |
+| `frontend/pages/` | 網頁畫面模板（每日紀錄、追蹤設定、儀表板、就診摘要），由 `server.js` 渲染；資料來自 Supabase |
 | `gas/daily/`（備用，不使用） | 家庭綁定與邀請（`Membership.gs`）、每日紀錄 API（`Api.gs`）、Rich Menu（`RichMenu.gs`）、建測試試算表（`Setup.gs`）、每日紀錄與設定頁 HTML |
 | `gas/dashboard/`（備用，不使用） | 儀表板 UI 與授權 API（`Code.gs`）；`dashboard-service.gs`、`health-adapter.gs` 由 `adapters/` 產出，**不要直接改** |
 | `adapters/` | 資料轉換與家庭授權邏輯（單一事實來源），Node 測試與 GAS 共用 |
 | `n8n/` | 唯一的 workflow [`main-flow.json`](n8n/main-flow.json)（LINE 分流、回診、用藥打卡、回診提醒），匯入方式與已知問題見 [n8n/README.md](n8n/README.md) |
 | `scripts/` | `sync-gas.sh`（adapters → gas/dashboard）、`prepare-n8n-import.js` |
 | `tests/` | `npm test`（Node 內建 test runner） |
+
+## 架構演進：為什麼同時有 GAS 與 Node + Supabase
+
+**第一階段：GAS + Google Sheets（已停用，保留備用）**
+- 資料放在 Google Sheets，GAS 當作 API，LINE 的 LIFF 頁面也由 GAS 提供。
+- 問題：GAS 網頁跑在 `googleusercontent.com` 的 iframe 裡，LINE 登入會被擋（`redirect_uri` 錯誤）。所以頁面改由 Node 提供，GAS 只剩資料 API。
+- 問題：每次呼叫都要經過 Apps Script，速度慢，而且資料表結構難以擴充（回診、用藥、權限）。
+
+**第二階段：Node + Supabase（目前使用）**
+- 頁面與 API 都由 Node（`frontend/server.js`，部署在 Render）提供，資料放在 Supabase（PostgreSQL）。
+- 授權仍以 LINE userId 為唯一依據，資料表結構與權限在 `supabase/schema.sql` 與 `supabase/migrations/`。
+- 網頁 API 由 `USE_V2_WEB=true` 啟用（`/api/status` 會顯示 `node+supabase`）。
+
+**目前各部分的狀態**
+
+| 部分 | 位置 | 狀態 |
+| --- | --- | --- |
+| 網頁畫面（模板） | `frontend/pages/` | 使用中，由 Node 渲染 |
+| 網頁 API 與資料 | `frontend/server.js`、`backend/`、Supabase | 使用中 |
+| LINE 分流、回診、用藥打卡 | `n8n/main-flow.json` | 使用中（已改讀寫 Supabase） |
+| 圖文選單建立 | `scripts/set-unbound-rich-menu.js`（本機執行） | 使用中 |
+| 舊 GAS 專案 | `gas/`、`*.gs` | 備用，不再被網頁呼叫；雲端的 Apps Script 仍是用這些檔案推上去的 |
+
+**注意**：`gas/` 資料夾裡的 HTML 是舊版模板，`frontend/pages/` 才是網頁正在使用的版本。要完全移除 GAS，順序是：確認網頁與 n8n 都不依賴 GAS → 刪除雲端的 Apps Script 專案 → 刪除 `gas/` 與 Render 上的 GAS 環境變數。
 
 ## 測試
 

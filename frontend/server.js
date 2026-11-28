@@ -4,8 +4,9 @@ const { createHmac, timingSafeEqual, randomBytes } = require('node:crypto');
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
 
-const gas = path.join(__dirname, '../gas');
-const read = (dir, name) => readFileSync(path.join(gas, dir, name + '.html'), 'utf8');
+// 網頁畫面（HTML/CSS/JS 模板）。資料讀寫在 Supabase，與這裡無關。
+const pages = path.join(__dirname, 'pages');
+const read = (dir, name) => readFileSync(path.join(pages, dir, name + '.html'), 'utf8');
 const scriptJSON = value => JSON.stringify(value).replace(/</g, '\\u003c');
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function https(value) {
