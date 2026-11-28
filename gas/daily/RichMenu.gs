@@ -26,7 +26,7 @@ function richMenuDefinitions_(liffId) {
     unbound: {
       size: {width: 2500, height: 843}, selected: true, name: 'unbound-v2', chatBarText: '綁定家人',
       areas: [
-        area(0, 300, 1617, 543, text('介紹陪你久久')),        // handled by n8n (reply with an intro message)
+        area(0, 300, 1617, 543, {type: 'uri', label: '介紹陪你久久', uri: 'https://sophiepm23.github.io/care99/'}),  // 外部介紹頁（與 scripts/set-unbound-rich-menu.js 一致）
         area(1617, 300, 883, 543, uri('建立照護家庭', 'bind'))
       ]
     },
