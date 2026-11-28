@@ -50,7 +50,7 @@ window.hubSession = (async () => {
     $('modalExtra').onclick = () => close('extra');
     $('modalCancel').onclick = () => close(false);
   });
-  const day = iso => new Date(iso).toLocaleDateString('zh-TW',{timeZone:'Asia/Taipei'});
+  const day = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('zh-TW',{timeZone:'Asia/Taipei'}); };
   const icon = name => '<svg class="ico" aria-hidden="true"><use href="#i-' + name + '"></use></svg>';
   const linkIcons = {'健康摘要':'chart','每日紀錄':'edit','會員中心':'people'};
   try {

@@ -177,7 +177,8 @@ async function deleteFamily({db, uid, nowMs = Date.now()}) {
   await db.update('families', {family_id: 'eq.' + me.family_id}, {deleted_at: at, deleted_by: uid});
   await db.update('family_invites', {family_id: 'eq.' + me.family_id}, {expires_at: at});
   await db.remove('members', {family_id: 'eq.' + me.family_id});
-  return {ok: true, bound: false, unbound: true, deleted: true, _unlinkUids: everyone.map(row => row.line_uid)};
+  return {ok: true, bound: false, unbound: true, deleted: true, restoreUntil: restoreUntil(at).toISOString(),
+    _unlinkUids: everyone.map(row => row.line_uid)};
 }
 
 // 3 個月內，刪除的人可以復原；復原後只有他一位成員（管理者），其他人用新邀請重新加入
