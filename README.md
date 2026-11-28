@@ -7,23 +7,23 @@ LINE LIFF 前端（Node）＋兩個 Google Apps Script（GAS）後端＋ Google 
 ## 架構
 
 ```
-LINE App ── LIFF ──► frontend/server.js (Node 22, 頂層 HTTPS)
+LINE App ── LIFF ──► frontend/server.js (Node 22, 頂層 HTTPS，Render)
                       ├─ 頁面：?page=bind | member | daily | settings | appointments | summary，根網址 = 儀表板
-                      ├─ POST /api/member, /api/daily ─► gas/daily     （家庭綁定、每日紀錄、追蹤設定、Rich Menu）
-                      ├─ POST /api/dashboard ──────────► gas/dashboard （唯讀：儀表板、就診摘要 PDF）
-                      └─ POST /line/events ────────────► n8n 主流程（驗 LINE 簽章後轉送）
-                                         GAS ──► Google Sheets（唯一資料來源）
+                      ├─ POST /api/member, /api/daily, /api/dashboard ─► Node + Supabase（USE_V2_WEB=true，目前使用）
+                      ├─ POST /line/events ───────────────────────────► n8n 主流程（驗 LINE 簽章後轉送）
+                      └─ 備用：USE_V2_WEB 不是 true 時，網頁 API 才會轉到 GAS（gas/，目前不使用）
 ```
 
-- LIFF 必須放在頂層 HTTPS 頁面。GAS 頁面在 `googleusercontent.com` iframe 內，LINE 登入會被擋（400 `redirect_uri`），所以 Node 負責頁面，GAS 只當資料 API。
-- 登入憑證：頁面取得 LIFF **access token**，GAS 向 LINE 驗證後取得 LINE userId，再查 `Members`。Dashboard 也接受 ID token。授權唯一依據是 `Members` 的 `lineUid`，前端傳入的 familyId／patientId 一律不信任。
+- LIFF 必須放在頂層 HTTPS 頁面。頁面與 API 都由 Node 提供；Supabase 是資料來源。
+- 登入憑證：頁面取得 LIFF **access token**，後端向 LINE 驗證取得 LINE userId，再查 `members`。授權唯一依據是 `members.line_uid`，前端傳入的 familyId／patientId 一律不信任。
 - 一個 LIFF ID 服務所有頁面，Size 用 Tall。按鈕連結一律是 `https://liff.line.me/<LIFF_ID>/?page=<頁面>`。
+- Render 部署分支：`feat/node-supabase`，設定見 [render.yaml](render.yaml)。
 
 | 路徑 | 用途 |
 | --- | --- |
 | `frontend/` | Node 主機（`server.js`）與綁定／會員頁（`member.html`、`member.js`） |
-| `gas/daily/` | 家庭綁定與邀請（`Membership.gs`）、每日紀錄 API（`Api.gs`）、Rich Menu（`RichMenu.gs`）、建測試試算表（`Setup.gs`）、每日紀錄與設定頁 HTML |
-| `gas/dashboard/` | 儀表板 UI 與授權 API（`Code.gs`）；`dashboard-service.gs`、`health-adapter.gs` 由 `adapters/` 產出，**不要直接改** |
+| `gas/daily/`（備用，不使用） | 家庭綁定與邀請（`Membership.gs`）、每日紀錄 API（`Api.gs`）、Rich Menu（`RichMenu.gs`）、建測試試算表（`Setup.gs`）、每日紀錄與設定頁 HTML |
+| `gas/dashboard/`（備用，不使用） | 儀表板 UI 與授權 API（`Code.gs`）；`dashboard-service.gs`、`health-adapter.gs` 由 `adapters/` 產出，**不要直接改** |
 | `adapters/` | 資料轉換與家庭授權邏輯（單一事實來源），Node 測試與 GAS 共用 |
 | `n8n/` | 唯一的 workflow [`main-flow.json`](n8n/main-flow.json)（LINE 分流、回診、用藥打卡、回診提醒），匯入方式與已知問題見 [n8n/README.md](n8n/README.md) |
 | `scripts/` | `sync-gas.sh`（adapters → gas/dashboard）、`prepare-n8n-import.js` |

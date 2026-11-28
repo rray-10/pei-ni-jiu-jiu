@@ -1,20 +1,47 @@
-# Render Blueprint for the staging LIFF host. Values marked sync:false are entered in the Render dashboard (never committed).
+# Render Blueprint for the staging LIFF host (branch feat/node-supabase).
+# Values marked sync:false are entered in the Render dashboard (never committed).
 services:
   - type: web
     name: pei-ni-jiu-jiu-staging
     runtime: node
     plan: free
-    branch: integration/f1-live
+    branch: feat/node-supabase
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /?page=bind
     envVars:
       - key: NODE_VERSION
         value: 22
+      # 網頁後端：true = Node + Supabase（目前使用）
+      - key: USE_V2_WEB
+        value: "true"
       - key: LIFF_ID
         sync: false
       - key: LIFF_ENDPOINT
         sync: false
+      - key: LINE_CHAT_URL
+        sync: false
+      - key: LINE_LOGIN_CHANNEL_ID
+        sync: false
+      - key: LINE_OA_ACCESS_TOKEN
+        sync: false
+      - key: LINE_MESSAGING_CHANNEL_SECRET
+        sync: false
+      - key: LINE_MAIN_WEBHOOK_URL
+        sync: false
+      - key: LINE_WEBHOOK_GATEWAY_KEY
+        sync: false
+      - key: BOUND_RICH_MENU_ID
+        sync: false
+      - key: ACTIVATE_GATEWAY_KEY
+        sync: false
+      - key: REQUIRE_OA_FRIEND
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      # GAS 備用（USE_V2_WEB=true 時不會呼叫，確認穩定後可移除）
       - key: MEMBER_GAS_URL
         sync: false
       - key: F1_API_URL
