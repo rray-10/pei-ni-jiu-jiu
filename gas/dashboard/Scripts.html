@@ -37,10 +37,10 @@ else if(state.metric==='glucose'){$('chartTitle').textContent='血糖'+(showTabl
   $('chartNote').textContent=showTable?'':'血糖量測情境（空腹／飯後）需分開解讀，本圖僅呈現紀錄值。淺色帶為目標範圍。';}
 else{const m=d.medication;
   if(showTable){$('chartTitle').textContent='用藥詳細';
-    const cell=x=>{if(x.status==='taken')return {html:x.counted?'<span class="mk-ok" aria-label="已吃，計入用藥率">✓</span>':'<span class="mk-off" aria-label="已吃，未計入用藥率">✓</span>'};if(x.status==='cancelled')return {html:'取消'};return {html:'—'};};
+    const cell=x=>{if(x.status==='taken')return {html:x.counted?'<span class="mk-ok" aria-label="已吃，計入用藥率">✓</span>':'<span class="mk-off" aria-label="已吃，未計入用藥率">✓</span>'};return {html:'—'};};
     if(!m.allSlots||!m.rows){$('chart').innerHTML='<div class="center">這個版本尚未提供用藥明細，請重新整理頁面；仍無法顯示時請通知管理者。</div>';$('chartNote').textContent='';return;}
-    $('chart').innerHTML='<style>.mk-ok{color:#38775c;font-weight:700}.mk-off{color:#9aa59f;font-weight:700}</style>'+table(['日期',...m.allSlots],m.rows.map(r=>[{html:date(r.date)},...r.slots.map(cell)]));
-    $('chartNote').innerHTML='<span class="mk-ok">✓</span> 綠色：已吃，計入用藥率。<br><span class="mk-off">✓</span> 灰色：有打卡，但這個時段沒有登錄用藥，<b>不計入用藥率</b>。<br>— 未打卡；取消 為取消打卡（今天還沒到的時段會先顯示為 —）。';}
+    $('chart').innerHTML='<style>.mk-ok{color:#1fa34a;font-weight:900;font-size:1.25em}.mk-off{color:#b4bcb7;font-weight:700;font-size:1.25em}</style>'+table(['日期',...m.allSlots],m.rows.map(r=>[{html:date(r.date)},...r.slots.map(cell)]));
+    $('chartNote').innerHTML='<span style="font-size:13px;color:#697b72;line-height:1.7;display:block"><span class="mk-ok">✓</span> 綠色：已吃，計入用藥率<br><span class="mk-off">✓</span> 灰色：有打卡，但該時段沒有登錄用藥，<b>不計入用藥率</b><br>— 沒有紀錄（今天還沒到的時段也會顯示為 —）</span>';}
   else{$('chartTitle').textContent='用藥紀錄';
     const big=m.rate===null?'未設定藥物':m.rate+'%';
     $('chart').innerHTML=`<div class="center"><strong style="font-size:${m.rate===null?'22px':'44px'};color:#38775c">${big}</strong><p>${m.total?`已吃 ${m.taken} 次／應吃 ${m.total} 次`:'家人尚未設定藥物，LINE 打卡仍會記錄在「數據」'}</p><p>點「數據」可看每天每個時段</p></div>`;
